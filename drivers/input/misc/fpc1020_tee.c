@@ -34,6 +34,30 @@
 #define FPC1020_RESET_HIGH1_US 100
 #define FPC1020_RESET_HIGH2_US 1250
 
+#define SUPPLY_1V8              1800000UL
+#define SUPPLY_3V3              3300000UL
+#define SUPPLY_SPI_MIN          SUPPLY_1V8
+#define SUPPLY_SPI_MAX          SUPPLY_1V8
+
+#define SUPPLY_IO_MIN           SUPPLY_1V8
+#define SUPPLY_IO_MAX           SUPPLY_1V8
+
+#define SUPPLY_ANA_MIN          SUPPLY_1V8
+#define SUPPLY_ANA_MAX          SUPPLY_1V8
+
+#define SUPPLY_TX_MIN           SUPPLY_3V3
+#define SUPPLY_TX_MAX           SUPPLY_3V3
+
+#define SUPPLY_SPI_REQ_CURRENT  10U
+#define SUPPLY_IO_REQ_CURRENT   6000U
+#define SUPPLY_ANA_REQ_CURRENT  6000U
+
+#define FPC_TTW_HOLD_TIME 1000
+
+#ifdef CONFIG_MSM_HOTPLUG
+extern void msm_hotplug_resume_timeout(void);
+#endif
+
 static const char * const pctl_names[] = {
 	"fpc1020_spi_active",
 	"fpc1020_reset_reset",
@@ -473,6 +497,20 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	input_event(fpc1020->idev, EV_MSC, MSC_SCAN, ++fpc1020->irq_num);
 	input_sync(fpc1020->idev);
 	dev_dbg(fpc1020->dev, "%s %d\n", __func__, fpc1020->irq_num);
+
+	/* Make sure 'wakeup_enabled' is updated before using it
+	** since this is interrupt context (other thread...) */
+	smp_rmb();
+
+	if (fpc1020->wakeup_enabled ) {
+		wake_lock_timeout(&fpc1020->ttw_wl, msecs_to_jiffies(FPC_TTW_HOLD_TIME));
+#ifdef CONFIG_MSM_HOTPLUG
+		msm_hotplug_resume_timeout();
+#endif
+	}
+
+	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
+
 	return IRQ_HANDLED;
 }
 

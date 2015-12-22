@@ -115,6 +115,7 @@ enum device_status {
 #define F12_MAX_Y		65536
 
 #ifdef CONFIG_MSM_HOTPLUG
+extern bool msm_hotplug_scr_suspended;
 extern void msm_hotplug_suspend(void);
 extern void msm_hotplug_resume(void);
 #endif
@@ -4241,6 +4242,28 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 	int retval;
 
+#ifdef CONFIG_MSM_HOTPLUG
+	msm_hotplug_scr_suspended = true;
+	msm_hotplug_suspend();
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
+	scr_suspended = true;
+
+	if (sovc_switch && sovc_tmp_onoff) {
+		if (!irq_wake_enabled) {
+			enable_irq_wake(rmi4_data->irq);
+			irq_wake_enabled = true;
+		}
+
+		mutex_lock(&suspended_mutex);
+		rmi4_data->suspended = true;
+		mutex_unlock(&suspended_mutex);
+
+		return 0;
+	}
+#endif
+
 	if (rmi4_data->stay_awake) {
 		rmi4_data->staying_awake = true;
 		return 0;
@@ -4326,6 +4349,25 @@ static int synaptics_rmi4_resume(struct device *dev)
 {
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 	int retval;
+
+#ifdef CONFIG_MSM_HOTPLUG
+	msm_hotplug_scr_suspended = false;
+	msm_hotplug_resume();
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
+	scr_suspended = false;
+
+	if (irq_wake_enabled) {
+		disable_irq_wake(rmi4_data->irq);
+		irq_wake_enabled = false;
+
+		mutex_lock(&suspended_mutex);
+		rmi4_data->suspended = false;
+		mutex_unlock(&suspended_mutex);
+		return 0;
+	}
+#endif
 
 	if (rmi4_data->staying_awake)
 		return 0;
