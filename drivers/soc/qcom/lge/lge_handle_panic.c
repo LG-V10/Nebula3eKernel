@@ -406,6 +406,13 @@ static int __init lge_panic_handler_early_init(void)
 {
 	struct device_node *np;
 	uint32_t crash_handler_magic = 0;
+	unsigned long ramoops_addr = 0;
+	unsigned long ramoops_size = 0;
+#ifdef CONFIG_KEXEC_HARDBOOT
+	unsigned long kexec_hardboot_addr = 0;
+	unsigned long kexec_hardboot_size = SZ_1M;
+	int ret;
+#endif
 
 	panic_handler = kzalloc(sizeof(*panic_handler), GFP_KERNEL);
 	if (!panic_handler) {
@@ -424,6 +431,30 @@ static int __init lge_panic_handler_early_init(void)
 		pr_err("unable to map imem\n");
 		return -ENODEV;
 	}
+
+	np = of_find_compatible_node(NULL, NULL, "ramoops");
+	if (!np) {
+		pr_err("unable to find ramoops node\n");
+		return -ENODEV;
+	}
+
+	of_property_read_u32(np, "android,ramoops-buffer-start", (u32*)&ramoops_addr);
+	of_property_read_u32(np, "android,ramoops-buffer-size", (u32*)&ramoops_size);
+	pr_info("%s: ramoops addr+size[@0x%lx+@0x%lx)\n", PANIC_HANDLER_NAME,
+			ramoops_addr, ramoops_size);
+
+#ifdef CONFIG_KEXEC_HARDBOOT
+	// Reserve space for hardboot page, just before the ram_console
+	kexec_hardboot_addr = ramoops_addr - kexec_hardboot_size;
+
+	ret = memblock_remove(kexec_hardboot_addr, kexec_hardboot_size);
+	if(!ret)
+		pr_info("Hardboot page reserved at 0x%lx\n", kexec_hardboot_addr);
+	else
+		pr_err("Failed to reserve space for hardboot page at 0x%lx!\n", kexec_hardboot_addr);
+#endif
+
+	lge_set_ram_console_addr(ramoops_addr, ramoops_size);
 
 	/* check struct boot_shared_imem_cookie_type is matched */
 	crash_handler_magic = __raw_readl(CRASH_HANDLER_MAGIC);
