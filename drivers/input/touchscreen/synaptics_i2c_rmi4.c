@@ -39,6 +39,50 @@
 #include "synaptics_i2c_rmi4.h"
 #include <linux/input/mt.h>
 
+#ifdef CONFIG_MSM_HOTPLUG
+#include <linux/msm_hotplug.h>
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#include <linux/input/sweep2wake.h>
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
+#ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
+#include <linux/input/scroff_volctr.h>
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE) || defined(CONFIG_TOUCHSCREEN_SCROFF_VOLCTR)
+#include "synaptics_i2c_rmi4_scr_suspended.h"
+#define RMI4_WL_HOLD_TIME_MS 1000
+
+bool scr_suspended = false;
+static bool irq_wake_enabled = false;
+static cputime64_t wake_lock_start_time = 0;
+
+static bool is_touch_on(void)
+{
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+	if (s2w_switch)
+		return true;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	if (dt2w_switch)
+		return true;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
+	if (sovc_switch && sovc_tmp_onoff) {
+		if (sovc_mic_detected)
+			return false;
+
+		return true;
+	}
+#endif
+	return false;
+}
+#endif
+
 #define DRIVER_NAME "synaptics_rmi4_i2c"
 #define INPUT_PHYS_NAME "synaptics_rmi4_i2c/input0"
 #define DEBUGFS_DIR_NAME "ts_debug"
@@ -115,7 +159,6 @@ enum device_status {
 #define F12_MAX_Y		65536
 
 #ifdef CONFIG_MSM_HOTPLUG
-extern bool msm_hotplug_scr_suspended;
 extern void msm_hotplug_suspend(void);
 extern void msm_hotplug_resume(void);
 #endif
@@ -4244,7 +4287,8 @@ static int synaptics_rmi4_suspend(struct device *dev)
 
 #ifdef CONFIG_MSM_HOTPLUG
 	msm_hotplug_scr_suspended = true;
-	msm_hotplug_suspend();
+	if (msm_enabled)
+		msm_hotplug_suspend();
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
@@ -4352,7 +4396,8 @@ static int synaptics_rmi4_resume(struct device *dev)
 
 #ifdef CONFIG_MSM_HOTPLUG
 	msm_hotplug_scr_suspended = false;
-	msm_hotplug_resume();
+	if (msm_enabled)
+		msm_hotplug_resume();
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
