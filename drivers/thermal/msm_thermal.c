@@ -89,7 +89,7 @@
 #endif
 
 // Big thermal limit
-#define DEF_BIG_TEMP_THRESHOLD 46
+#define DEF_BIG_TEMP_THRESHOLD 50
 #define HOTPLUG_SENSOR_ID 18
 #define HOTPLUG_HYSTERESIS 2
 
