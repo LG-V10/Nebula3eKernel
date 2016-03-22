@@ -139,7 +139,11 @@ static void mcapi_callback(struct sk_buff *skb)
 
 static int __init mcapi_init(void)
 {
-	struct netlink_kernel_cfg netlink_cfg;
+#if defined MC_NETLINK_COMPAT || defined MC_NETLINK_COMPAT_V37
+	struct netlink_kernel_cfg cfg = {
+		.input  = mcapi_callback,
+	};
+#endif
 
 	dev_set_name(mc_kapi, "mcapi");
 
@@ -156,9 +160,18 @@ static int __init mcapi_init(void)
 		MCDRV_DBG_ERROR(mc_kapi, "Allocation failure");
 		return -ENOMEM;
 	}
-	/* start kernel thread */
+#ifdef MC_NETLINK_COMPAT_V37
 	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK,
-						    &netlink_cfg);
+					    &cfg);
+#elif defined MC_NETLINK_COMPAT
+	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK,
+					    THIS_MODULE, &cfg);
+#else
+	/* start kernel thread */
+	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK, 0,
+					    mcapi_callback, NULL, THIS_MODULE);
+#endif
+
 	if (!mod_ctx->sk) {
 		MCDRV_ERROR(mc_kapi, "register of receive handler failed");
 		kfree(mod_ctx);

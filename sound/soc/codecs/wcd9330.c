@@ -681,8 +681,10 @@ int tomtom_enable_qfuse_sensing(struct snd_soc_codec *codec)
 	 * before checking the status.
 	 */
 	usleep_range(5000, 5500);
-	if ((snd_soc_read(codec, TOMTOM_A_QFUSE_STATUS) & (0x03)) != 0x03)
-		WARN(1, "%s: Qfuse sense is not complete\n", __func__);
+    if ((snd_soc_read(codec, TOMTOM_A_QFUSE_STATUS) & (0x03)) != 0x03) {
+        WARN(1, "%s: Qfuse sense is not complete\n", __func__);
+        return 1;
+    }
 	return 0;
 }
 EXPORT_SYMBOL(tomtom_enable_qfuse_sensing);
@@ -3633,7 +3635,11 @@ static int tomtom_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMU:
+#ifdef CONFIG_MACH_LGE
+		usleep_range(20000, 20100);
+#else
 		usleep_range(5000, 5100);
+#endif
 		/* Let MBHC module know so micbias is on */
 		wcd9xxx_resmgr_notifier_call(&tomtom->resmgr, e_post_on);
 		break;
@@ -4392,7 +4398,7 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_codec *codec = w->codec;
 	struct tomtom_priv *tomtom = snd_soc_codec_get_drvdata(codec);
-	enum wcd9xxx_notify_event e_pre_on, e_post_off;
+	enum wcd9xxx_notify_event e_pre_on, e_post_off, e_pre_off;
 	u8 req_clsh_state;
 	u32 pa_settle_time = TOMTOM_HPH_PA_SETTLE_COMP_OFF;
 
@@ -4400,10 +4406,12 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 	if (w->shift == 5) {
 		e_pre_on = WCD9XXX_EVENT_PRE_HPHL_PA_ON;
 		e_post_off = WCD9XXX_EVENT_POST_HPHL_PA_OFF;
+		e_pre_off = WCD9XXX_EVENT_PRE_HPHL_PA_OFF;
 		req_clsh_state = WCD9XXX_CLSH_STATE_HPHL;
 	} else if (w->shift == 4) {
 		e_pre_on = WCD9XXX_EVENT_PRE_HPHR_PA_ON;
 		e_post_off = WCD9XXX_EVENT_POST_HPHR_PA_OFF;
+		e_pre_off = WCD9XXX_EVENT_PRE_HPHR_PA_OFF;
 		req_clsh_state = WCD9XXX_CLSH_STATE_HPHR;
 	} else {
 		pr_err("%s: Invalid w->shift %d\n", __func__, w->shift);
@@ -4415,14 +4423,12 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		if (w->shift == 5)
+		if(5 == w->shift) {
 			set_bit(HPH_DELAY_L, &tomtom->status_mask);
-		else if (w->shift == 4)
+		} else if (4 == w->shift) {
 			set_bit(HPH_DELAY_R, &tomtom->status_mask);
-		else {
-			pr_err("%s: Invalid w->shift %d\n", __func__,
-				w->shift);
-			return -EINVAL;
+		} else {
+			pr_err("%s: SND_SOC_DAPM_PRE_PMU failed\n", __func__);
 		}
 		/* Let MBHC module know PA is turning on */
 		wcd9xxx_resmgr_notifier_call(&tomtom->resmgr, e_pre_on);
@@ -4431,16 +4437,16 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		if (test_bit(HPH_DELAY_L, &tomtom->status_mask)) {
 			/*
-			 * Make sure to wait 10ms after enabling HPHL
+			 * Make sure to wait 10ms after enabling HPHR_HPHL
 			 * in register 0x1AB
 			*/
 			usleep_range(pa_settle_time, pa_settle_time + 1000);
 			clear_bit(HPH_DELAY_L, &tomtom->status_mask);
 			pr_debug("%s: sleep %d us after %s PA enable\n",
 				__func__, pa_settle_time, w->name);
-		} else if (test_bit(HPH_DELAY_R, &tomtom->status_mask)) {
+		} else if(test_bit(HPH_DELAY_R, &tomtom->status_mask)) {
 			/*
-			 * Make sure to wait 10ms after enabling HPHR
+			 * Make sure to wait 10ms after enabling HPHR_HPHL
 			 * in register 0x1AB
 			*/
 			usleep_range(pa_settle_time, pa_settle_time + 1000);
@@ -4448,9 +4454,7 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 			pr_debug("%s: sleep %d us after %s PA enable\n",
 				__func__, pa_settle_time, w->name);
 		} else {
-			pr_err("%s: Invalid w->shift %d\n", __func__,
-				w->shift);
-			return -EINVAL;
+			pr_debug("%s: SND_SOC_DAPM_POST_PMU failed\n", __func__);
 		}
 		if (!high_perf_mode && !tomtom->uhqa_mode) {
 			wcd9xxx_clsh_fsm(codec, &tomtom->clsh_d,
@@ -4461,23 +4465,23 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 		break;
 
 	case SND_SOC_DAPM_PRE_PMD:
-		if (w->shift == 5)
+		if(5 == w->shift) {
 			set_bit(HPH_DELAY_L, &tomtom->status_mask);
-		else if (w->shift == 4)
+		} else if (4 == w->shift) {
 			set_bit(HPH_DELAY_R, &tomtom->status_mask);
-		else {
-			pr_err("%s: Invalid w->shift %d\n", __func__,
-				 w->shift);
-			return -EINVAL;
+		} else {
+			pr_debug("%s: SND_SOC_DAPM_PRE_PMD failed\n", __func__);
 		}
 		break;
 
 	case SND_SOC_DAPM_POST_PMD:
+
 		/* Let MBHC module know PA turned off */
 		wcd9xxx_resmgr_notifier_call(&tomtom->resmgr, e_post_off);
+
 		if (test_bit(HPH_DELAY_L, &tomtom->status_mask)) {
 			/*
-			 * Make sure to wait 10ms after disabling HPHL
+			 * Make sure to wait 10ms after disabling HPHR_HPHL
 			 * in register 0x1AB
 			*/
 			usleep_range(pa_settle_time, pa_settle_time + 1000);
@@ -4486,17 +4490,15 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 				__func__, pa_settle_time, w->name);
 		} else if (test_bit(HPH_DELAY_R, &tomtom->status_mask)) {
 			/*
-			 * Make sure to wait 10ms after disabling HPHR
+			 * Make sure to wait 10ms after disabling HPHR_HPHL
 			 * in register 0x1AB
 			*/
 			usleep_range(pa_settle_time, pa_settle_time + 1000);
 			clear_bit(HPH_DELAY_R, &tomtom->status_mask);
 			pr_debug("%s: sleep %d us after %s PA disable\n",
 				__func__, pa_settle_time, w->name);
-		} else {
-			pr_err("%s: Invalid w->shift %d\n", __func__,
-				 w->shift);
-			return -EINVAL;
+		}else {
+			pr_debug("%s: SND_SOC_DAPM_POST_PMD failed\n", __func__);
 		}
 
 		break;
@@ -6110,6 +6112,83 @@ static int tomtom_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int tomtom_digital_mute(struct snd_soc_dai *dai, int mute)
+{
+	struct snd_soc_codec *codec = NULL;
+	struct wcd9xxx_ch *ch = NULL;
+	struct tomtom_priv *tomtom;
+	u32 tx_port = 0;
+	u16 tx_vol_ctl_reg = 0, tx_port_reg = 0;
+	u8 tx_port_reg_val = 0;
+	s8 decimator = 0;
+
+	 if (!dai || !dai->codec) {
+		pr_err("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	codec = dai->codec;
+	if (dai->id != AIF1_CAP &&
+	    dai->id != AIF2_CAP &&
+	    dai->id != AIF3_CAP) {
+		dev_dbg(codec->dev, "%s: Not capture use case skip\n",
+			__func__);
+		return 0;
+	}
+
+	tomtom = snd_soc_codec_get_drvdata(codec);
+	if (!tomtom) {
+		dev_err(codec->dev,
+			"%s: drvdata get failed\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_err("%s: enter, mute = %d \n", __func__, mute);
+
+	mute = (mute) ? 1 : 0;
+	usleep_range(10000, 10000);
+	list_for_each_entry(ch, &tomtom->dai[dai->id].wcd9xxx_ch_list, list) {
+		tx_port = ch->port + 1;
+		dev_err(codec->dev, "%s: dai->id = %d, tx_port = %d",
+			__func__, dai->id, tx_port);
+		if ((tx_port < 1) || (tx_port > NUM_DECIMATORS)) {
+			dev_err(codec->dev, "%s: Invalid SLIM TX%u DAI ID is %d\n",
+				__func__, tx_port, dai->id);
+			return -EINVAL;
+		}
+
+		tx_port_reg = TOMTOM_A_CDC_CONN_TX_SB_B1_CTL + (tx_port - 1);
+		tx_port_reg_val = snd_soc_read(codec, tx_port_reg);
+		decimator = 0;
+		if ((tx_port >= 1) && (tx_port <= 6)) {
+			tx_port_reg_val = tx_port_reg_val & 0x0F;
+			if (tx_port_reg_val == 0x8)
+				decimator = tx_port;
+		} else if ((tx_port >= 7) && (tx_port <= NUM_DECIMATORS)) {
+			tx_port_reg_val = tx_port_reg_val & 0x1F;
+			if ((tx_port_reg_val >= 0x8) &&
+			    (tx_port_reg_val <= 0x11)) {
+				decimator = (tx_port_reg_val - 0x8) + 1;
+			}
+		}
+
+		if (decimator && decimator <= NUM_DECIMATORS) {
+			dev_err(codec->dev, "%s: Decimator used %d\n",
+				__func__, decimator);
+			tx_vol_ctl_reg =
+				TOMTOM_A_CDC_TX1_VOL_CTL_CFG + 8 * (decimator - 1);
+			/* Set TX digital mute */
+			snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, mute);
+		} else {
+			dev_err(codec->dev, "%s: Invalid Decimator used %d\n",
+				__func__, decimator);
+		}
+	}
+
+	pr_err("%s: leave\n", __func__);
+	return 0;
+}
+
 static struct snd_soc_dai_ops tomtom_dai_ops = {
 	.startup = tomtom_startup,
 	.shutdown = tomtom_shutdown,
@@ -6118,6 +6197,7 @@ static struct snd_soc_dai_ops tomtom_dai_ops = {
 	.set_fmt = tomtom_set_dai_fmt,
 	.set_channel_map = tomtom_set_channel_map,
 	.get_channel_map = tomtom_get_channel_map,
+	.digital_mute = tomtom_digital_mute,
 };
 
 static struct snd_soc_dai_driver tomtom_dai[] = {
@@ -8083,7 +8163,10 @@ static int wcd9xxx_prepare_static_pa(struct wcd9xxx_mbhc *mbhc,
 		{WCD9XXX_A_BUCK_MODE_2, 0xff, 0xEF},
 		{WCD9XXX_A_BUCK_MODE_2, 0xff, 0xEE},
 		{TOMTOM_A_NCP_DTEST, 0xff, 0x20},
+#ifdef CONFIG_MACH_LGE
+#else
 		{WCD9XXX_A_CDC_CLK_OTHR_CTL, 0xff, 0x21},
+#endif
 		{WCD9XXX_A_CDC_RX2_B6_CTL, 0xff, 0x81},
 		{WCD9XXX_A_CDC_CLK_RX_B1_CTL, 0x02, 0x02},
 

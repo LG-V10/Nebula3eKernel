@@ -2787,19 +2787,27 @@ static int rcu_pending(int cpu)
 }
 
 /*
- * Check to see if any future RCU-related work will need to be done
- * by the current CPU, even if none need be done immediately, returning
- * 1 if so.
+ * Return true if the specified CPU has any callback.  If all_lazy is
+ * non-NULL, store an indication of whether all callbacks are lazy.
+ * (If there are no callbacks, all of them are deemed to be lazy.)
  */
-static int rcu_cpu_has_callbacks(int cpu)
+static int rcu_cpu_has_callbacks(int cpu, bool *all_lazy)
 {
+	bool al = true;
+	bool hc = false;
+	struct rcu_data *rdp;
 	struct rcu_state *rsp;
 
-	/* RCU callbacks either ready or pending? */
-	for_each_rcu_flavor(rsp)
-		if (per_cpu_ptr(rsp->rda, cpu)->nxtlist)
-			return 1;
-	return 0;
+	for_each_rcu_flavor(rsp) {
+		rdp = per_cpu_ptr(rsp->rda, cpu);
+		if (rdp->qlen != rdp->qlen_lazy)
+			al = false;
+		if (rdp->nxtlist)
+			hc = true;
+	}
+	if (all_lazy)
+		*all_lazy = al;
+	return hc;
 }
 
 /*

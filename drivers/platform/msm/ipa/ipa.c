@@ -1521,6 +1521,9 @@ static int ipa_q6_set_ex_path_dis_agg(void)
 */
 int ipa_q6_cleanup(void)
 {
+	int client_idx;
+	int res;
+
 	ipa_inc_client_enable_clks();
 
 	if (ipa_q6_pipe_delay()) {

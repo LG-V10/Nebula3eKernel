@@ -164,7 +164,13 @@ static struct msm_bus_scale_pdata msm_cpp_bus_scale_data = {
 	qcmd;			 \
 })
 
+/*                                                                                */
+#if 0 //qct original
 #define MSM_CPP_MAX_TIMEOUT_TRIAL 0
+#else
+#define MSM_CPP_MAX_TIMEOUT_TRIAL 3
+#endif
+/*                                                                                */
 
 struct msm_cpp_timer_data_t {
 	struct cpp_device *cpp_dev;
@@ -314,8 +320,8 @@ static void cpp_timer_callback(unsigned long data);
 
 uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
-
-static void msm_cpp_write(u32 data, void __iomem *cpp_base)
+/*                                                                               */
+static inline void msm_cpp_write(u32 data, void __iomem *cpp_base)
 {
 	writel_relaxed((data), cpp_base + MSM_CPP_MICRO_FIFO_RX_DATA);
 }
