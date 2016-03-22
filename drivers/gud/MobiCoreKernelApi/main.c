@@ -149,13 +149,7 @@ static int __init mcapi_init(void)
 
 	dev_info(mc_kapi, "Mobicore API module initialized!\n");
 
-	netlink_cfg.groups = 0;
-	netlink_cfg.flags = 0;
-	netlink_cfg.input = mcapi_callback;
-	netlink_cfg.cb_mutex = NULL;
-	netlink_cfg.bind = NULL;
-
-	mod_ctx = kzalloc(sizeof(struct mc_kernelapi_ctx), GFP_KERNEL);
+	mod_ctx = kzalloc(sizeof(*mod_ctx), GFP_KERNEL);
 	if (mod_ctx == NULL) {
 		MCDRV_DBG_ERROR(mc_kapi, "Allocation failure");
 		return -ENOMEM;

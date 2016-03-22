@@ -285,15 +285,6 @@ static int __ref bcl_cpu_ctrl_callback(struct notifier_block *nfb,
 		} else {
 			pr_debug("voting for CPU%d to be online\n", cpu);
 		}
-		break;
-	case CPU_ONLINE:
-		if (bcl_hotplug_enabled && (bcl_hotplug_request & BIT(cpu))) {
-			pr_debug("CPU%d online. reevaluate hotplug\n", cpu);
-			schedule_work(&bcl_hotplug_work);
-		}
-		break;
-	default:
-		break;
 	}
 
 	return NOTIFY_OK;
@@ -1788,7 +1779,9 @@ static int bcl_probe(struct platform_device *pdev)
 	bcl_psy.get_property     = bcl_battery_get_property;
 	bcl_psy.set_property     = bcl_battery_set_property;
 	bcl_psy.num_properties = 0;
+#ifndef CONFIG_LGE_PM
 	bcl_psy.external_power_changed = power_supply_callback;
+#endif
 
 	gbcl = bcl;
 	platform_set_drvdata(pdev, bcl);
