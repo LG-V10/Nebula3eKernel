@@ -20,6 +20,7 @@
 #include "slimport7816_tx_drv.h"
 #include "slimport7816_tx_reg.h"
 #ifdef CONFIG_MACH_LGE
+#include <linux/platform_device.h>
 #include <soc/qcom/lge/board_lge.h>
 #endif
 
