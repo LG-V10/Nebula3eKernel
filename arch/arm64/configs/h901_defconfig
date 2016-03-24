@@ -367,7 +367,7 @@ CONFIG_SECCOMP=y
 #
 CONFIG_CMDLINE="console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 user_debug=31 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 androidboot.hardware=pplus"
 CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE=y
-CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES="msm8992-pplus_tmo_us-rev-0 msm8992-pplus_tmo_us-rev-a msm8992-pplus_tmo_us-rev-b msm8992-pplus_tmo_us-rev-10 msm8992-pplus_tmo_us-rev-evb3"
+CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES="msm8992-pplus_tmo_us-rev-10 msm8992-pplus_tmo_us-rev-a msm8992-pplus_tmo_us-rev-evb3 msm8992-pplus_tmo_us-rev-0 msm8992-pplus_tmo_us-rev-b"
 # CONFIG_EFI is not set
 
 #
