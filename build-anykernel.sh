@@ -529,12 +529,18 @@ function make_modules {
 }
 
 function make_dtb {
-		DTB=`find . -name "*.dtb" | head -1`echo $DTB
+		DTB=`find . -name "*.dtb" | head -1`; echo $DTB
 		echo $DTB
 		DTBDIR=`dirname $DTB`
 		echo $DTBDIR
-		[[ -z `strings $DTB | grep "qcom,board-id"` ]] || DTBVERCMD="--force-v3"
+		if [[ -z `strings $DTB | grep "qcom,board-id"` ]] ; then
+#		DTBVERCMD="--force-v3"
+		DTBVERCMD="-2"
 		echo $DTBVERCMD
+		else
+		DTBVERCMD="-2"
+		echo $DTBVERCMD
+		fi
 		$DTBTOOL_DIR/$DTBTOOL $DTBVERCMD -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ $DTBDIR/
 
 # 	$REPACK_DIR/tools/dtbtool -v -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ arch/arm64/boot/dts/
@@ -689,7 +695,7 @@ case $menuitem in
 		SA_Synapse) Build_Stand_Alone_Synapse ;;
 		bump_uci) bump_uci ;;
 		Settings) menu_settings ;;
-		Test) file=build-anykernel.sh; check_filesize ;;
+		Test) make_dtb ; exit ;;
 		2Test) echo "kernel: $KERNEL_DIR and $ZIMAGE_DIR"; exit ;;
 		Exit) echo "Bye"; exit;;
 		Cancel) exit ;;
