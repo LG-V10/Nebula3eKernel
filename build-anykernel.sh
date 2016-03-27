@@ -73,6 +73,7 @@ TestBuild=0
 export ERROR_LOG=ERRORS
 export LOCALVERSION=$LOCALVERSION
 export CROSS_COMPILE=$CROSS_COMPILE
+export STRIP=$STRIP
 export CHAIN=$CHAIN
 export ARCH=$ARCH
 export SUBARCH=$SUBARCH
@@ -80,6 +81,7 @@ export KBUILD_BUILD_USER=$KBUILD_BUILD_USER
 export KBUILD_BUILD_HOST=$KBUILD_BUILD_USER
 export CCACHE=$CCACHE
 export USE_SCRIPTS=$USE_SCRIPTS
+export DTBTOOL=$DTBTOOL
 #export ERROR_LOG=$ERROR_LOG
 
 ##################################################################
@@ -98,6 +100,7 @@ ZIP_MOVE="$ZIP_MOVE" >&2
 COPY_ZIP="$COPY_ZIP" >&2
 ZIMAGE_DIR="$ZIMAGE_DIR" >&2
 STAND_ALONE_UCI_DIR="$STAND_ALONE_UCI_DIR" >&2
+DTBTOOL_DIR="$DTBTOOL_DIR" >&2
 ##################################################################
 
 # Functions
@@ -518,15 +521,27 @@ function make_modules {
 		if [ -f "$MODULES_DIR/*.ko" ]; then
 			rm `echo $MODULES_DIR"/*.ko"`
 		fi
-		find $KERNEL_DIR -name '*.ko' -exec cp -v {} $MODULES_DIR \;
+		echo "Copying modules"
+		find $KERNEL_DIR -name '*.ko' -exec cp -v {} $MODULES_DIR/ \;
+		cd $MODULES_DIR
+		echo "Stripping modules for size"
+		$STRIP --strip-unneeded *.ko
 }
 
 function make_dtb {
-		$REPACK_DIR/tools/dtbToolCM -v2 -o $REPACK_DIR/$DTBIMAGE -s 2048 -p scripts/dtc/ arch/arm64/boot/dts/
+		DTB=`find . -name "*.dtb" | head -1`echo $DTB
+		echo $DTB
+		DTBDIR=`dirname $DTB`
+		echo $DTBDIR
+		[[ -z `strings $DTB | grep "qcom,board-id"` ]] || DTBVERCMD="--force-v3"
+		echo $DTBVERCMD
+		$DTBTOOL_DIR/$DTBTOOL $DTBVERCMD -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ $DTBDIR/
+
+# 	$REPACK_DIR/tools/dtbtool -v -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ arch/arm64/boot/dts/
 }
 
 function make_boot {
-		cp -vr $ZIMAGE_DIR/Image.gz-dtb $REPACK_DIR/zImage
+		cp -vr $ZIMAGE_DIR/Image.gz $REPACK_DIR/zImage
 		
 		. appendramdisk.sh
 }

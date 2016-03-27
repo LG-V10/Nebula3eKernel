@@ -19,7 +19,7 @@ include $(srctree)/arch/arm64/boot/dts/lge/Makefile
 
 targets := Image Image.gz
 
-dtb-y += $(notdir $(wildcard $(obj)/dts/*.dtb))
+dtb-y += $(notdir $(wildcard $(obj)/dts/lge/*.dtb))
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
 DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
