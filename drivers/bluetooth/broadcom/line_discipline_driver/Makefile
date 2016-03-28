@@ -7,4 +7,4 @@ KBUILD_CFLAGS += -w
 EXTRA_CFLAGS := -I$(PWD)/../include/
 
 ccflags-y := -DVERSION="\"$(BUILD_MODULE_VERSION)\""
-## ccflags-y += -DLPM_BLUESLEEP
+ccflags-y += -DLPM_BLUESLEEP
