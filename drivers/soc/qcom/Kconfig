@@ -645,7 +645,7 @@ config KERNEL_TEXT_MPU_PROT
 
 config STATE_NOTIFIER
         bool "State Notifier"
-	default n
+	default y
 
 config MSM_PERFORMANCE_HOTPLUG_ON
         bool "Hotplug functionality through msm_performance turned on"
@@ -660,7 +660,7 @@ config MSM_PERFORMANCE_HOTPLUG_ON
 config MSM_HOTPLUG
 	bool "MSM hotplug driver"
 	depends on HOTPLUG_CPU
-	default y
+	default n
 	help
 	  The MSM hotplug driver controls on-/offlining of additional cores based
 	  on current cpu load.
