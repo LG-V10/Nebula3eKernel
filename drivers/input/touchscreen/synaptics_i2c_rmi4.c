@@ -163,6 +163,10 @@ extern void msm_hotplug_suspend(void);
 extern void msm_hotplug_resume(void);
 #endif
 
+#ifdef CONFIG_THERMAL_MONITOR
+extern void msm_thermal_suspend(bool suspend);
+#endif
+
 static int synaptics_rmi4_i2c_read(struct synaptics_rmi4_data *rmi4_data,
 		unsigned short addr, unsigned char *data,
 		unsigned short length);
@@ -4370,10 +4374,75 @@ err_gpio_configure:
 	synaptics_rmi4_regulator_lpm(rmi4_data, false);
 
 err_lpm_regulator:
-	if (rmi4_data->sensor_sleep) {
-		synaptics_rmi4_sensor_wake(rmi4_data);
-		synaptics_rmi4_irq_enable(rmi4_data, true);
-		rmi4_data->touch_stopped = false;
+
+	if (rmi4_data_touch_off->sensor_sleep) {
+		synaptics_rmi4_sensor_wake(rmi4_data_touch_off);
+		synaptics_rmi4_irq_enable(rmi4_data_touch_off, true);
+		rmi4_data_touch_off->touch_stopped = false;
+	}
+
+	touch_off_rc = retval;
+	synaptics_rmi4_touch_off_triggered = false;
+	return;
+
+reschedule:
+	synaptics_rmi4_touch_off_triggered = false;
+	synaptics_rmi4_touch_off_trigger(100);
+}
+static DECLARE_DELAYED_WORK(synaptics_rmi4_touch_off_work, synaptics_rmi4_touch_off);
+
+void synaptics_rmi4_touch_off_trigger(unsigned int delay)
+{
+	schedule_delayed_work(&synaptics_rmi4_touch_off_work,
+				msecs_to_jiffies(delay));
+}
+EXPORT_SYMBOL(synaptics_rmi4_touch_off_trigger);
+
+static int synaptics_rmi4_suspend(struct device *dev)
+{
+	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	rmi4_data_touch_off = rmi4_data;
+
+#ifdef CONFIG_UKSM
+	if (uksm_run_stored != UKSM_RUN_STOP)
+		uksm_run = UKSM_RUN_STOP;
+#elif defined(CONFIG_KSM_LEGACY)
+	if (ksm_run_stored != KSM_RUN_STOP)
+		ksm_run = KSM_RUN_STOP;
+#endif
+
+#ifdef CONFIG_DYNAMIC_FSYNC
+	if (dyn_fsync_active)
+		dyn_fsync_suspend();
+#endif
+
+#ifdef CONFIG_THERMAL_MONITOR
+	// Must be doen before msm_hotplug_suspend()
+	msm_thermal_suspend(true);
+#endif
+
+#ifdef CONFIG_MSM_HOTPLUG
+	msm_hotplug_scr_suspended = true;
+	if (msm_enabled)
+		msm_hotplug_suspend();
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE) || defined(CONFIG_TOUCHSCREEN_SCROFF_VOLCTR)
+	scr_suspended = true;
+
+	if (is_touch_on()) {
+		if (!irq_wake_enabled) {
+			enable_irq_wake(rmi4_data->irq);
+			irq_wake_enabled = true;
+		}
+
+		mutex_lock(&suspended_mutex);
+		rmi4_data->suspended = true;
+		rmi4_touch_is_off = false;
+		mutex_unlock(&suspended_mutex);
+
+		return 0;
 	}
 
 	return retval;
@@ -4400,7 +4469,11 @@ static int synaptics_rmi4_resume(struct device *dev)
 		msm_hotplug_resume();
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_SCROFF_VOLCTR
+#ifdef CONFIG_THERMAL_MONITOR
+	msm_thermal_suspend(false);
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_SWEEP2WAKE) || defined(CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE) || defined(CONFIG_TOUCHSCREEN_SCROFF_VOLCTR)
 	scr_suspended = false;
 
 	if (irq_wake_enabled) {
