@@ -542,12 +542,13 @@ function make_dtb {
 		echo $DTBVERCMD
 		fi
 		$DTBTOOL_DIR/$DTBTOOL $DTBVERCMD -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ $DTBDIR/
+#		$DTBTOOL_DIR/$DTBTOOL $DTBVERCMD -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ $DTBDIR/
 
 # 	$REPACK_DIR/tools/dtbtool -v -o $REPACK_DIR/$DTBIMAGE -s 4096 -p scripts/dtc/ arch/arm64/boot/dts/
 }
 
 function make_boot {
-		cp -vr $ZIMAGE_DIR/Image.gz $REPACK_DIR/zImage
+		cp -vr $ZIMAGE_DIR/Image $REPACK_DIR/zImage
 		
 		. appendramdisk.sh
 }
