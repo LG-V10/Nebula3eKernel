@@ -31,7 +31,7 @@
 #define BIG_CORES	2
 
 #define MSM_HOTPLUG			"msm_hotplug"
-#define HOTPLUG_ENABLED			1
+#define HOTPLUG_ENABLED			0
 #define DEFAULT_UPDATE_RATE		HZ / 10
 #define START_DELAY			HZ * 20
 #define MIN_INPUT_INTERVAL		150 * 1000L
@@ -53,7 +53,7 @@ EXPORT_SYMBOL(msm_hotplug_scr_suspended);
 
 void msm_hotplug_suspend(void);
 
-static unsigned int debug = 0;
+static unsigned int debug = 1;
 module_param_named(debug_mask, debug, uint, 0644);
 
 #define dprintk(msg...)		\
