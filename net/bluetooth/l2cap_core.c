@@ -745,6 +745,9 @@ static void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len,
 	if (!skb)
 		return;
 
+	if (conn->hcon == NULL || conn->hcon->hdev == NULL)
+		return;
+
 	if (lmp_no_flush_capable(conn->hcon->hdev))
 		flags = ACL_START_NO_FLUSH;
 	else
@@ -1793,10 +1796,10 @@ int l2cap_chan_connect(struct l2cap_chan *chan, __le16 psm, u16 cid,
 	auth_type = l2cap_get_auth_type(chan);
 
 	if (chan->dcid == L2CAP_CID_LE_DATA)
-		hcon = hci_connect(hdev, LE_LINK, dst, dst_type,
+		hcon = hci_connect(hdev, LE_LINK, 0, dst, dst_type,
 				   chan->sec_level, auth_type);
 	else
-		hcon = hci_connect(hdev, ACL_LINK, dst, dst_type,
+		hcon = hci_connect(hdev, ACL_LINK, 0, dst, dst_type,
 				   chan->sec_level, auth_type);
 
 	if (IS_ERR(hcon)) {
@@ -2098,10 +2101,12 @@ static void l2cap_ertm_resend(struct l2cap_chan *chan)
 					   tx_skb->data + L2CAP_HDR_SIZE);
 		}
 
+		/* Update FCS */
 		if (chan->fcs == L2CAP_FCS_CRC16) {
-			u16 fcs = crc16(0, (u8 *) tx_skb->data, tx_skb->len);
-			put_unaligned_le16(fcs, skb_put(tx_skb,
-							L2CAP_FCS_SIZE));
+			u16 fcs = crc16(0, (u8 *) tx_skb->data,
+					tx_skb->len - L2CAP_FCS_SIZE);
+			put_unaligned_le16(fcs, skb_tail_pointer(tx_skb) -
+						L2CAP_FCS_SIZE);
 		}
 
 		l2cap_do_send(chan, tx_skb);
@@ -2447,6 +2452,9 @@ int l2cap_chan_send(struct l2cap_chan *chan, struct msghdr *msg, size_t len,
 	struct sk_buff *skb;
 	int err;
 	struct sk_buff_head seg_queue;
+
+	if (!chan->conn)
+		return -ENOTCONN;
 
 	/* Connectionless channel */
 	if (chan->chan_type == L2CAP_CHAN_CONN_LESS) {

@@ -16,9 +16,9 @@
 #include <linux/ipv6.h>
 #include <net/checksum.h>
 
-#include <linux/netfilter/x_tables.h>
-#include <linux/netfilter_ipv4/ipt_TTL.h>
-#include <linux/netfilter_ipv6/ip6t_HL.h>
+#include <uapi/linux/netfilter/x_tables.h>
+#include <uapi/linux/netfilter_ipv4/ipt_TTL.h>
+#include <uapi/linux/netfilter_ipv6/ip6t_HL.h>
 
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_AUTHOR("Maciej Soltysiak <solt@dns.toxicfilms.tv>");
