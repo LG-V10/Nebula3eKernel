@@ -531,6 +531,7 @@ config FORCE_MAX_ZONEORDER
 
 config SECCOMP
 	bool "Enable seccomp to safely compute untrusted bytecode"
+	default y
 	---help---
 	  This kernel feature is useful for number crunching applications
 	  that may need to compute untrusted bytecode during their
@@ -588,6 +589,14 @@ config BUILD_ARM64_APPENDED_DTB_IMAGE
 	  Enabling this option will cause a concatenated Image.gz and list of
 	  DTBs to be built by default (instead of a standalone Image.gz.)
 	  The image will built in arch/arm64/boot/Image.gz-dtb
+
+config BUILD_ARM64_UNCOMPRESSED_APPENDED_DTB_IMAGE
+	bool "Build a concatenated Image/dtb by default"
+	depends on OF
+	help
+	  Enabling this option will cause a concatenated Image and list of
+	  DTBs to be built by default (instead of a standalone Image.gz.)
+	  The image will built in arch/arm64/boot/Image-dtb
 
 config BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES
 	string "Default dtb names"

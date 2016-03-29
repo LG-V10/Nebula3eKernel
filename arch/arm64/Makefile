@@ -33,6 +33,14 @@ endif
 
 comma = ,
 
+#
+# The Scalar Replacement of Aggregates (SRA) optimization pass in GCC 4.9 and
+# later may result in code being generated that handles signed short and signed
+# char struct members incorrectly. So disable it.
+# (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932)
+#
+KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-sra)
+
 CHECKFLAGS	+= -D__aarch64__
 
 # Default value
@@ -54,7 +62,11 @@ libs-y		+= $(LIBGCC)
 ifeq ($(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE),y)
 KBUILD_IMAGE	:= Image.gz-dtb
 else
+ifeq ($(CONFIG_BUILD_ARM64_UNCOMPRESSED_APPENDED_DTB_IMAGE),y)
+KBUILD_IMAGE	:= Image-dtb
+else
 KBUILD_IMAGE	:= Image.gz
+endif
 endif
 
 KBUILD_DTBS	:= dtbs
@@ -74,18 +86,22 @@ zinstall install: vmlinux
 
 dtbs: scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+ifeq ($(CONFIG_MACH_LGE),y)
+	$(Q)$(MAKE) $(build)=$(boot)/dts/lge dtbs
+else
 	$(Q)$(MAKE) $(build)=$(boot)/dts/qcom dtbs
+endif
 
 PHONY += vdso_install
 vdso_install:
 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
 
-Image.gz-dtb: vmlinux scripts dtbs
+Image-dtb Image.gz-dtb: vmlinux scripts dtbs
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
-	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)$(MAKE) $(clean)=$(boot)/dts
 
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'

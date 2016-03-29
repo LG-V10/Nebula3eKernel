@@ -1080,6 +1080,7 @@ struct ravg {
 #ifdef CONFIG_SCHED_FREQ_INPUT
 	u32 curr_window, prev_window;
 #endif
+	u32 demand_for_migration; /* LG Cancun Project */
 };
 
 struct sched_entity {
@@ -1154,6 +1155,9 @@ struct task_struct {
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
 	int on_cpu;
+	struct task_struct *last_wakee;
+	unsigned long wakee_flips;
+	unsigned long wakee_flip_decay_ts;
 #endif
 	int on_rq;
 

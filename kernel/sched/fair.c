@@ -1259,6 +1259,15 @@ unsigned int __read_mostly sysctl_sched_init_task_load_pct = 15;
 unsigned int __read_mostly sysctl_sched_min_runtime = 0; /* 0 ms */
 u64 __read_mostly sched_min_runtime = 0; /* 0 ms */
 
+/* LG Cancun Project */
+static inline unsigned int task_load_migration(struct task_struct *p)
+{
+	if (sched_use_pelt)
+		return p->se.avg.runnable_avg_sum_scaled;
+
+	return p->ravg.demand_for_migration;
+}
+
 static inline unsigned int task_load(struct task_struct *p)
 {
 	if (sched_use_pelt)
@@ -1359,6 +1368,19 @@ int __read_mostly sysctl_sched_upmigrate_min_nice = 15;
  */
 unsigned int sysctl_sched_boost;
 
+#define BMHB_MAX_CS_IP (200)
+#define BMHB_MIN_CS (1*1024)
+static unsigned int __read_mostly sched_bmhb_cs = 0;
+unsigned int __read_mostly sysctl_sched_bmhb_cs = 0;
+static unsigned int __read_mostly sched_bmhb_load;
+unsigned int __read_mostly sysctl_sched_bmhb_load_pct = 70;
+
+static int bmhb_stat = 0;
+
+/* LG Cancun Project*/
+unsigned int sysctl_sched_cancun = 1;
+
+
 static inline int available_cpu_capacity(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
@@ -1379,6 +1401,9 @@ void set_hmp_defaults(void)
 
 	sched_downmigrate =
 		pct_to_real(sysctl_sched_downmigrate_pct);
+
+	sched_bmhb_load =
+		pct_to_real(sysctl_sched_bmhb_load_pct);
 
 #ifdef CONFIG_SCHED_FREQ_INPUT
 	sched_heavy_task =
@@ -1718,6 +1743,9 @@ static int eligible_cpu(u64 task_load, u64 cpu_load, int cpu, int sync)
 	if (mostly_idle_cpu_sync(cpu, cpu_load, sync))
 		return 1;
 
+	if (rq->capacity != max_capacity)
+		return !spill_threshold_crossed(task_load, cpu_load, rq) &&
+		       !sched_cpu_high_irqload(cpu);
 	if (rq->max_possible_capacity != max_possible_capacity)
 		return !spill_threshold_crossed(task_load, cpu_load, rq);
 
@@ -2053,6 +2081,9 @@ static int select_best_cpu(struct task_struct *p, int target, int reason,
 
 	trq = task_rq(p);
 	cpumask_and(&search_cpus, tsk_cpus_allowed(p), cpu_online_mask);
+	if (unlikely(cpumask_empty(&search_cpus)))
+	return task_cpu(p);
+
 	for_each_cpu(i, &search_cpus) {
 		struct rq *rq = cpu_rq(i);
 
@@ -2063,6 +2094,13 @@ static int select_best_cpu(struct task_struct *p, int target, int reason,
 				     power_cost(scale_load_to_cpu(task_load(p),
 						i), i),
 				     cpu_temp(i));
+
+		if (bmhb_stat && !reason &&
+			rq->capacity > trq->capacity) {
+			cpumask_andnot(&search_cpus, &search_cpus,
+						&rq->freq_domain_cpumask);
+			continue;
+		}
 
 		if (skip_freq_domain(trq, rq, reason)) {
 			cpumask_andnot(&search_cpus, &search_cpus,
@@ -2598,6 +2636,16 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 		goto done;
 	}
 
+	if (data == &sysctl_sched_bmhb_cs) {
+		if(*data > BMHB_MAX_CS_IP) {
+			*data = old_val;
+			ret = -EINVAL;
+		} else {
+			sched_bmhb_cs = 1024 * sysctl_sched_bmhb_cs / 100;
+		}
+		goto done;
+	}
+
 	if (data == (unsigned int *)&sysctl_sched_upmigrate_min_nice) {
 		if ((*(int *)data) < -20 || (*(int *)data) > 19) {
 			*data = old_val;
@@ -2767,11 +2815,12 @@ static inline int migration_needed(struct rq *rq, struct task_struct *p)
 	if (sched_cpu_high_irqload(cpu_of(rq)))
 		return IRQLOAD_MIGRATION;
 
-	if ((nice > sched_upmigrate_min_nice || upmigrate_discouraged(p)) &&
+	if ((nice > sched_upmigrate_min_nice || upmigrate_discouraged(p) ||
+		bmhb_stat) &&
 			 rq->capacity > min_capacity)
 		return DOWN_MIGRATION;
 
-	if (!task_will_fit(p, cpu_of(rq)))
+	if (!bmhb_stat && !task_will_fit(p, cpu_of(rq)))
 		return UP_MIGRATION;
 
 	if (sysctl_sched_enable_power_aware &&
@@ -4805,13 +4854,6 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
 			return;
 		}
 
-		/*
-		 * Don't schedule slices shorter than 10000ns, that just
-		 * doesn't make sense. Rely on vruntime for fairness.
-		 */
-		if (rq->curr != p)
-			delta = max_t(s64, 10000LL, delta);
-
 		hrtick_start(rq, delta);
 	}
 }
@@ -5011,6 +5053,23 @@ static unsigned long cpu_avg_load_per_task(int cpu)
 	return 0;
 }
 
+static void record_wakee(struct task_struct *p)
+{
+	/*
+	 * Rough decay (wiping) for cost saving, don't worry
+	 * about the boundary, really active task won't care
+	 * about the loss.
+	 */
+	if (jiffies > current->wakee_flip_decay_ts + HZ) {
+		current->wakee_flips = 0;
+		current->wakee_flip_decay_ts = jiffies;
+	}
+
+	if (current->last_wakee != p) {
+		current->last_wakee = p;
+		current->wakee_flips++;
+	}
+}
 
 static void task_waking_fair(struct task_struct *p)
 {
@@ -5031,6 +5090,7 @@ static void task_waking_fair(struct task_struct *p)
 #endif
 
 	se->vruntime -= min_vruntime;
+	record_wakee(p);
 }
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -5149,6 +5209,28 @@ static inline unsigned long effective_load(struct task_group *tg, int cpu,
 
 #endif
 
+static int wake_wide(struct task_struct *p)
+{
+	int factor = nr_cpus_node(cpu_to_node(smp_processor_id()));
+
+	/*
+	 * Yeah, it's the switching-frequency, could means many wakee or
+	 * rapidly switch, use factor here will just help to automatically
+	 * adjust the loose-degree, so bigger node will lead to more pull.
+	 */
+	if (p->wakee_flips > factor) {
+		/*
+		 * wakee is somewhat hot, it needs certain amount of cpu
+		 * resource, so if waker is far more hot, prefer to leave
+		 * it alone.
+		 */
+		if (current->wakee_flips > (factor * p->wakee_flips))
+			return 1;
+	}
+
+	return 0;
+}
+
 static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
 {
 	s64 this_load, load;
@@ -5157,6 +5239,13 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
 	struct task_group *tg;
 	unsigned long weight;
 	int balanced;
+
+	/*
+	 * If we wake multiple tasks be careful to not bounce
+	 * ourselves around too much.
+	 */
+	if (wake_wide(p))
+		return 0;
 
 	idx	  = sd->wake_idx;
 	this_cpu  = smp_processor_id();
@@ -6359,6 +6448,32 @@ struct sg_lb_stats {
 };
 
 #ifdef CONFIG_SCHED_HMP
+static int
+check_and_update_bmhb_stat(struct cpumask *cpus, u64 tload)
+{
+	int nr_cpus = 0;
+	int stat = 0;
+	struct cpumask online_cpus;
+
+	if (capacity_scale > sched_bmhb_cs || capacity_scale < BMHB_MIN_CS) {
+		goto update_stat;
+	}
+
+	cpumask_and(&online_cpus, cpus, cpu_online_mask);
+
+	nr_cpus = cpumask_weight(&online_cpus);
+
+	if (tload < (u64)nr_cpus * (u64)sched_bmhb_load)
+		stat = 1;
+
+update_stat:
+	if (bmhb_stat != stat) {
+		bmhb_stat = stat;
+		pr_info("bmhb stat: %d\n", stat);
+	}
+
+	return stat;
+}
 
 static int
 bail_inter_cluster_balance(struct lb_env *env, struct sd_lb_stats *sds)
@@ -6367,6 +6482,9 @@ bail_inter_cluster_balance(struct lb_env *env, struct sd_lb_stats *sds)
 
 	if (group_rq_capacity(sds->this) <= group_rq_capacity(sds->busiest))
 		return 0;
+
+	if (check_and_update_bmhb_stat(sched_group_cpus(sds->busiest), sds->busiest_scaled_load))
+		return 1;
 
 	if (sds->busiest_nr_big_tasks)
 		return 0;
@@ -7900,7 +8018,7 @@ void nohz_balance_enter_idle(int cpu)
 	set_bit(NOHZ_TICK_STOPPED, nohz_flags(cpu));
 }
 
-static int __cpuinit sched_ilb_notifier(struct notifier_block *nfb,
+static int sched_ilb_notifier(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {
 	switch (action & ~CPU_TASKS_FROZEN) {

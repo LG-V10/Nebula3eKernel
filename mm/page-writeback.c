@@ -528,6 +528,23 @@ int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned max_ratio)
 }
 EXPORT_SYMBOL(bdi_set_max_ratio);
 
+#ifdef CONFIG_CHECK_SYNC_TIME
+int bdi_set_max_sync_count(struct backing_dev_info *bdi, unsigned max_sync_count)
+{
+	int ret = 0;
+
+	if (max_sync_count > 256)
+		return -EINVAL;
+
+	spin_lock_bh(&bdi_lock);
+	bdi->max_sync_count = max_sync_count;
+	spin_unlock_bh(&bdi_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(bdi_set_max_sync_count);
+#endif
+
 static unsigned long dirty_freerun_ceiling(unsigned long thresh,
 					   unsigned long bg_thresh)
 {
@@ -1761,7 +1778,7 @@ void writeback_set_ratelimit(void)
 		ratelimit_pages = 16;
 }
 
-static int __cpuinit
+static int
 ratelimit_handler(struct notifier_block *self, unsigned long action,
 		  void *hcpu)
 {
@@ -1776,7 +1793,7 @@ ratelimit_handler(struct notifier_block *self, unsigned long action,
 	}
 }
 
-static struct notifier_block __cpuinitdata ratelimit_nb = {
+static struct notifier_block ratelimit_nb = {
 	.notifier_call	= ratelimit_handler,
 	.next		= NULL,
 };

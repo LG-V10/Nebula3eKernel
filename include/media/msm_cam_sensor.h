@@ -26,6 +26,23 @@
 #define MAX_OIS_MOD_NAME_SIZE 32
 #define MAX_OIS_NAME_SIZE 32
 #define MAX_OIS_REG_SETTINGS 800
+/*                                                        */
+#define MAX_PROXY_MOD_NAME_SIZE 32
+#define MAX_PROXY_NAME_SIZE 32
+#define MAX_PROXY_REG_SETTINGS 800
+/*                                                        */
+
+/*                                                   */
+#define MAX_TCS_MOD_NAME_SIZE 32
+#define MAX_TCS_NAME_SIZE 32
+#define MAX_TCS_REG_SETTINGS 800
+/*                                                   */
+
+/*                                                */
+#define MAX_MH1_MOD_NAME_SIZE 32
+#define MAX_MH1_NAME_SIZE 32
+#define MAX_MH1_REG_SETTINGS 800
+/*                                                */
 
 #define MOVE_NEAR 0
 #define MOVE_FAR  1
@@ -85,6 +102,15 @@ enum sensor_sub_module_t {
 	SUB_MODULE_CSIPHY,
 	SUB_MODULE_CSIPHY_3D,
 	SUB_MODULE_OIS,
+/*                                                        */
+	SUB_MODULE_PROXY,
+/*                                                        */
+/*                                                   */
+	SUB_MODULE_TCS,
+/*                                                   */
+/*                                                */
+	SUB_MODULE_MH1,
+/*                                                */
 	SUB_MODULE_MAX,
 };
 
@@ -213,6 +239,22 @@ struct msm_sensor_info_t {
 	int modes_supported;
 	enum camb_position_t position;
 };
+
+/*                                                      */
+struct msm_ois_info_t{
+	char ois_provider[MAX_SENSOR_NAME];
+	int16_t gyro[2];
+	int16_t target[2];
+	int16_t hall[2];
+	uint8_t is_stable;
+};
+
+enum ois_ver_t {
+	OIS_VER_RELEASE,
+	OIS_VER_CALIBRATION,
+	OIS_VER_DEBUG
+};
+/*                                                      */
 
 struct camera_vreg_t {
 	const char *reg_name;
@@ -409,6 +451,9 @@ enum msm_sensor_cfg_type_t {
 	CFG_SET_AUTOFOCUS,
 	CFG_CANCEL_AUTOFOCUS,
 	CFG_SET_STREAM_TYPE,
+	CFG_GET_SENSER_TEMPERATURE, /*                                                                       */
+	CFG_SET_PREVIEW_TUNE_ON,        /*                                                                                */
+	CFG_SET_PREVIEW_TUNE_OFF,         /*                                                                                */
 };
 
 enum msm_actuator_cfg_type_t {
@@ -424,11 +469,62 @@ enum msm_actuator_cfg_type_t {
 
 enum msm_ois_cfg_type_t {
 	CFG_OIS_INIT,
+	CFG_GET_OIS_INFO, /*                                                      */
 	CFG_OIS_POWERDOWN,
+	CFG_OIS_INI_SET,  /*                                                      */
+	CFG_OIS_ENABLE,   /*                                                      */
+	CFG_OIS_DISABLE,  /*                                                      */
 	CFG_OIS_POWERUP,
 	CFG_OIS_CONTROL,
 	CFG_OIS_I2C_WRITE_SEQ_TABLE,
+	CFG_OIS_SET_MODE, /*                                                        */
+	CFG_OIS_MOVE_LENS,/*                                                        */
 };
+
+/*                                                        */
+enum msm_proxy_cfg_type_t {
+	CFG_PROXY_INIT,
+	CFG_PROXY_ON,
+	CFG_PROXY_OFF,
+	CFG_GET_PROXY,
+	CFG_PROXY_THREAD_ON,
+	CFG_PROXY_THREAD_PAUSE,
+	CFG_PROXY_THREAD_RESTART,
+	CFG_PROXY_THREAD_OFF,
+	CFG_PROXY_CAL,
+	CFG_PROXY_POWERDOWN,
+	CFG_PROXY_POWERUP,
+};
+/*                                                        */
+
+/*                                                   */
+enum msm_tcs_cfg_type_t {
+	CFG_TCS_INIT,
+	CFG_TCS_ON,
+	CFG_TCS_OFF,
+	CFG_GET_TCS,
+	CFG_TCS_THREAD_ON,
+	CFG_TCS_THREAD_PAUSE,
+	CFG_TCS_THREAD_RESTART,
+	CFG_TCS_THREAD_OFF,
+	CFG_TCS_POWERDOWN,
+	CFG_TCS_POWERUP,
+	CFG_TCS_AAT_MODE,
+};
+/*                                                   */
+
+/*                                                */
+enum msm_mh1_cfg_type_t {
+	CFG_MH1_INIT,
+	CFG_MH1_SET_CURRENT_RES,
+	CFG_MH1_SENSOR_MODE,
+	CFG_MH1_HDR_MODE,
+    CFG_MH1_AEC_UPDATE,
+    CFG_MH1_AWB_UPDATE,
+    CFG_MH1_SENSOR_EXP_GAIN,
+	CFG_MH1_SET_SHADING_TBL,
+};
+/*                                                */
 
 enum msm_ois_i2c_operation {
 	MSM_OIS_WRITE = 0,
@@ -455,7 +551,53 @@ struct msm_ois_params_t {
 
 struct msm_ois_set_info_t {
 	struct msm_ois_params_t ois_params;
+/*                                                      */
+	struct msm_ois_info_t *ois_info;
+	void	*setting;
+/*                                                      */
 };
+
+struct msm_proxy_info_t{
+	uint16_t proxy_val;
+	uint32_t proxy_conv;
+	uint32_t proxy_sig;
+	uint32_t proxy_amb;
+	uint32_t proxy_raw;
+	uint32_t cal_count;
+	uint32_t cal_done;
+};
+
+/*                                                   */
+struct msm_tcs_info_t{
+	uint32_t status;
+	uint32_t clear;
+	uint32_t red;
+	uint32_t green;
+	uint32_t blue;
+	uint32_t ir;
+	uint32_t extra1;
+	uint32_t extra2;
+};
+/*                                                   */
+
+/*                                                */
+struct msm_mh1_awb_info_t {
+  uint16_t awb_gain_r;
+  uint16_t awb_gain_b;
+  uint16_t awb_cct;
+};
+
+struct msm_mh1_exp_info_t {
+  uint32_t exp_time;
+  uint32_t gain;
+  uint16_t lux_index;
+  uint16_t flash_rate;
+};
+
+struct msm_mh1_info_t{
+	void *setting;
+};
+/*                                                */
 
 struct msm_actuator_move_params_t {
 	int8_t dir;
@@ -534,6 +676,37 @@ struct msm_ois_cfg_data {
 	} cfg;
 };
 
+/*                                                        */
+struct msm_proxy_cfg_data {
+	int cfgtype;
+	union {
+		struct msm_proxy_info_t set_info;
+	} cfg;
+};
+/*                                                        */
+
+/*                                                   */
+struct msm_tcs_cfg_data {
+	int cfgtype;
+	union {
+		struct msm_tcs_info_t set_info;
+} cfg;
+};
+/*                                                   */
+
+/*                                                */
+struct msm_mh1_cfg_data {
+	int cfgtype;
+	union {
+		struct msm_mh1_info_t set_info;
+        uint8_t hdr_mode;
+        uint8_t sensor_mode;
+		uint8_t cur_res;
+        unsigned short *shading_tbl;
+} cfg;
+};
+/*                                                */
+
 struct msm_actuator_set_position_t {
 	uint16_t number_of_steps;
 	uint16_t pos[MAX_NUMBER_OF_STEPS];
@@ -558,6 +731,8 @@ enum msm_camera_led_config_t {
 	MSM_CAMERA_LED_HIGH,
 	MSM_CAMERA_LED_INIT,
 	MSM_CAMERA_LED_RELEASE,
+	/*                                 */
+	MSM_CAMERA_LED_TORCH,
 };
 
 struct msm_camera_led_cfg_t {
@@ -632,9 +807,22 @@ struct sensor_init_cfg_data {
 
 #define VIDIOC_MSM_OIS_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, struct msm_ois_cfg_data)
+/*                                                        */
+#define VIDIOC_MSM_PROXY_CFG \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct msm_proxy_cfg_data)
+/*                                                        */
 
 #define VIDIOC_MSM_FLASH_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 13, struct msm_flash_cfg_data_t)
+/*                                                 */
+#define VIDIOC_MSM_TCS_CFG \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 14, struct msm_tcs_cfg_data)
+/*                                                 */
+
+/*                                                */
+#define VIDIOC_MSM_MH1_CFG \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 15, struct msm_mh1_cfg_data)
+/*                                                */
 
 #ifdef CONFIG_COMPAT
 struct msm_camera_i2c_reg_setting32 {
@@ -729,6 +917,10 @@ struct msm_ois_params_t32 {
 
 struct msm_ois_set_info_t32 {
 	struct msm_ois_params_t32 ois_params;
+/*                                                      */
+	compat_uptr_t ois_info;
+	compat_uptr_t setting;
+/*                                                      */
 };
 
 struct msm_ois_cfg_data32 {
@@ -739,6 +931,24 @@ struct msm_ois_cfg_data32 {
 	} cfg;
 };
 
+/*                                                        */
+struct msm_proxy_info_t32{
+	uint16_t proxy_val;
+	uint32_t proxy_conv;
+	uint32_t proxy_sig;
+	uint32_t proxy_amb;
+	uint32_t proxy_raw;
+	uint32_t cal_count;
+	uint32_t cal_done;
+};
+
+struct msm_proxy_cfg_data32 {
+	int cfgtype;
+	union {
+		struct msm_proxy_info_t set_info;
+	} cfg;
+};
+/*                                                        */
 struct msm_flash_init_info_t32 {
 	enum msm_flash_driver_type flash_driver_type;
 	uint32_t slave_addr;
@@ -755,6 +965,42 @@ struct msm_flash_cfg_data_t32 {
 		compat_uptr_t settings;
 	} cfg;
 };
+/*                                                   */
+struct msm_tcs_info_t32{
+	uint32_t status;
+	uint32_t clear;
+	uint32_t red;
+	uint32_t green;
+	uint32_t blue;
+	uint32_t ir;
+	uint32_t extra1;
+	uint32_t extra2;
+};
+
+struct msm_tcs_cfg_data32 {
+	int cfgtype;
+	union {
+		struct msm_tcs_info_t set_info;
+	} cfg;
+};
+/*                                                   */
+
+/*                                                */
+struct msm_mh1_info_t32{
+    compat_uptr_t setting;
+};
+
+struct msm_mh1_cfg_data32 {
+	int cfgtype;
+	union {
+		struct msm_mh1_info_t32 set_info;
+        uint8_t hdr_mode;
+        uint8_t sensor_mode;
+		uint8_t cur_res;
+		compat_uptr_t shading_tbl;
+} cfg;
+};
+/*                                                */
 
 #define VIDIOC_MSM_ACTUATOR_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 6, struct msm_actuator_cfg_data32)
@@ -773,12 +1019,26 @@ struct msm_flash_cfg_data_t32 {
 
 #define VIDIOC_MSM_OIS_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 11, struct msm_ois_cfg_data32)
-
+/*                                                        */
+#define VIDIOC_MSM_PROXY_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct msm_proxy_cfg_data32)
+/*                                                        */
 #define VIDIOC_MSM_CSID_IO_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 5, struct csid_cfg_data32)
 
 #define VIDIOC_MSM_FLASH_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 13, struct msm_flash_cfg_data_t32)
+
+/*                                                   */
+#define VIDIOC_MSM_TCS_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 14, struct msm_tcs_cfg_data32)
+/*                                                   */
+
+/*                                                */
+#define VIDIOC_MSM_MH1_CFG32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 15, struct msm_mh1_cfg_data32)
+/*                                                */
+
 #endif
 
 #endif /* __LINUX_MSM_CAM_SENSOR_H */

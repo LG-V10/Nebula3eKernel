@@ -478,7 +478,15 @@ static void __hrtick_start(void *arg)
 void hrtick_start(struct rq *rq, u64 delay)
 {
 	struct hrtimer *timer = &rq->hrtick_timer;
-	ktime_t time = ktime_add_ns(timer->base->get_time(), delay);
+	ktime_t time;
+	s64 delta;
+
+	/*
+	 * Don't schedule slices shorter than 10000ns, that just
+	 * doesn't make sense and can cause timer DoS.
+	 */
+	delta = max_t(s64, delay, 10000LL);
+	time = ktime_add_ns(timer->base->get_time(), delta);
 
 	hrtimer_set_expires(timer, time);
 
@@ -1212,6 +1220,8 @@ unsigned int min_capacity = 1024; /* min(rq->capacity) */
 unsigned int max_load_scale_factor = 1024; /* max possible load scale factor */
 unsigned int max_possible_capacity = 1024; /* max(rq->max_possible_capacity) */
 
+unsigned int capacity_scale = 1024;
+
 /* Mask of all CPUs that have  max_possible_capacity */
 cpumask_t mpc_mask = CPU_MASK_ALL;
 
@@ -1270,8 +1280,12 @@ static inline u64 scale_exec_time(u64 delta, struct rq *rq)
 
 	if (unlikely(cur_freq > max_possible_freq ||
 		     (cur_freq == rq->max_freq &&
-		      rq->max_freq < rq->max_possible_freq)))
-		cur_freq = rq->max_possible_freq;
+		      rq->max_freq < rq->max_possible_freq))){
+		if(sysctl_sched_cancun)
+			cur_freq = rq->max_freq; /* LG Cancun Project*/
+		else
+			cur_freq = rq->max_possible_freq;
+	}
 
 	/* round up div64 */
 	delta = div64_u64(delta * cur_freq + max_possible_freq - 1,
@@ -1687,6 +1701,18 @@ static void update_history(struct rq *rq, struct task_struct *p,
 		demand = avg;
 	else
 		demand = max(avg, runtime);
+
+	/* LG Cancun Project */
+	if(sysctl_sched_cancun){
+		if(rq->efficiency < max_possible_efficiency){
+			demand = max(avg, runtime);
+			p->ravg.demand_for_migration = avg;
+		}
+		else{
+			demand = min(avg, runtime);
+			p->ravg.demand_for_migration = demand;
+		}
+	}
 
 	p->ravg.demand = demand;
 
@@ -2341,16 +2367,25 @@ static void __update_min_max_capacity(void)
 {
 	int i;
 	int max = 0, min = INT_MAX;
+	int max_i = 0;
 
 	for_each_online_cpu(i) {
-		if (cpu_rq(i)->capacity > max)
+		if (cpu_rq(i)->capacity > max) {
 			max = cpu_rq(i)->capacity;
+			max_i = i;
+		}
 		if (cpu_rq(i)->capacity < min)
 			min = cpu_rq(i)->capacity;
 	}
 
 	max_capacity = max;
 	min_capacity = min;
+	if (cpu_rq(max_i)->efficiency != max_possible_efficiency) {
+		int temp = max;
+		max = min;
+		min = temp;
+	}
+	capacity_scale = DIV_ROUND_UP(1024 * max, min);
 }
 
 static void update_min_max_capacity(void)
@@ -3031,10 +3066,11 @@ ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
 		u64 delta = rq->clock - rq->idle_stamp;
 		u64 max = 2*sysctl_sched_migration_cost;
 
-		if (delta > max)
+		update_avg(&rq->avg_idle, delta);
+
+		if (rq->avg_idle > max)
 			rq->avg_idle = max;
-		else
-			update_avg(&rq->avg_idle, delta);
+		
 		rq->idle_stamp = 0;
 	}
 #endif
@@ -6747,7 +6783,7 @@ void show_state_filter(unsigned long state_filter)
 		debug_show_all_locks();
 }
 
-void __cpuinit init_idle_bootup_task(struct task_struct *idle)
+void init_idle_bootup_task(struct task_struct *idle)
 {
 	idle->sched_class = &idle_sched_class;
 }
@@ -6760,7 +6796,7 @@ void __cpuinit init_idle_bootup_task(struct task_struct *idle)
  * NOTE: this function does not set the idle thread's NEED_RESCHED
  * flag, to make booting more robust.
  */
-void __cpuinit init_idle(struct task_struct *idle, int cpu)
+void init_idle(struct task_struct *idle, int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long flags;
@@ -7260,7 +7296,7 @@ static void set_rq_offline(struct rq *rq)
  * migration_call - callback that gets triggered when a CPU is added.
  * Here we can start up the necessary migration thread for the new CPU.
  */
-static int __cpuinit
+static int
 migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	int cpu = (long)hcpu;
@@ -7320,12 +7356,12 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
  * happens before everything else.  This has to be lower priority than
  * the notifier in the perf_event subsystem, though.
  */
-static struct notifier_block __cpuinitdata migration_notifier = {
+static struct notifier_block migration_notifier = {
 	.notifier_call = migration_call,
 	.priority = CPU_PRI_MIGRATION,
 };
 
-static int __cpuinit sched_cpu_active(struct notifier_block *nfb,
+static int sched_cpu_active(struct notifier_block *nfb,
 				      unsigned long action, void *hcpu)
 {
 	switch (action & ~CPU_TASKS_FROZEN) {
@@ -7337,7 +7373,7 @@ static int __cpuinit sched_cpu_active(struct notifier_block *nfb,
 	}
 }
 
-static int __cpuinit sched_cpu_inactive(struct notifier_block *nfb,
+static int sched_cpu_inactive(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {
 	switch (action & ~CPU_TASKS_FROZEN) {

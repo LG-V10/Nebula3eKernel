@@ -1338,6 +1338,14 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 		return -EFAULT;
 	}
 
+#ifdef CONFIG_MACH_MSM8992_P1
+    // Do not follow below code except P1 M OS, it is only for P1 M OS!
+    if (!memcmp(load_img_req.img_name, "keymaste", strlen("keymaste"))) {
+        pr_err("keymaster TZ app can't be loaded from this model\n");
+        return -EFAULT;
+    }
+#endif
+
 	if (qseecom.support_bus_scaling) {
 		mutex_lock(&qsee_bw_mutex);
 		ret = __qseecom_register_bus_bandwidth_needs(data, MEDIUM);
@@ -2806,6 +2814,7 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	if (ret < 0)
 		goto err;
 
+	data->client.app_id = ret;
 	if (ret > 0) {
 		pr_warn("App id %d for [%s] app exists\n", ret,
 			(char *)app_ireq.app_name);
@@ -2833,7 +2842,6 @@ int qseecom_start_app(struct qseecom_handle **handle,
 		data->client.app_id = ret;
 		strlcpy(data->client.app_name, app_name, MAX_APP_NAME_SIZE);
 	}
-	data->client.app_id = ret;
 	if (!found_app) {
 		entry = kmalloc(sizeof(*entry), GFP_KERNEL);
 		if (!entry) {

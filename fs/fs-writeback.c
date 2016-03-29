@@ -780,10 +780,6 @@ static bool over_bground_thresh(struct backing_dev_info *bdi)
 
 	global_dirty_limits(&background_thresh, &dirty_thresh);
 
-	if (global_page_state(NR_FILE_DIRTY) +
-	    global_page_state(NR_UNSTABLE_NFS) > background_thresh)
-		return true;
-
 	if (bdi_stat(bdi, BDI_RECLAIMABLE) >
 				bdi_dirty_limit(bdi, background_thresh))
 		return true;
@@ -1087,10 +1083,8 @@ void wakeup_flusher_threads(long nr_pages, enum wb_reason reason)
 {
 	struct backing_dev_info *bdi;
 
-	if (!nr_pages) {
-		nr_pages = global_page_state(NR_FILE_DIRTY) +
-				global_page_state(NR_UNSTABLE_NFS);
-	}
+	if (!nr_pages)
+		nr_pages = get_nr_dirty_pages();
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(bdi, &bdi_list, bdi_list) {
@@ -1411,6 +1405,28 @@ void sync_inodes_sb(struct super_block *sb)
 	wait_sb_inodes(sb);
 }
 EXPORT_SYMBOL(sync_inodes_sb);
+
+#ifdef CONFIG_CHECK_SYNC_TIME
+void async_inodes_sb(struct super_block *sb)
+{
+	struct wb_writeback_work *work;
+
+	work = kzalloc(sizeof(*work), GFP_ATOMIC);
+	if (!work) {
+		trace_writeback_nowork(sb->s_bdi);
+		bdi_wakeup_thread(sb->s_bdi);
+		return;
+	}
+
+	work->sb = sb;
+	work->sync_mode = WB_SYNC_NONE;
+	work->nr_pages	= LONG_MAX;
+	work->range_cyclic = 0;
+	work->reason	= WB_REASON_SYNC;
+	bdi_queue_work(sb->s_bdi, work);
+}
+EXPORT_SYMBOL(async_inodes_sb);
+#endif
 
 /**
  * write_inode_now	-	write an inode to disk
