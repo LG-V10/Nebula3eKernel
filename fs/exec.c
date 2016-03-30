@@ -65,6 +65,16 @@
 #include "coredump.h"
 
 #include <trace/events/sched.h>
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+#include "sreadahead_prof.h"
+/*             */
+
 
 int suid_dumpable = 0;
 
@@ -131,6 +141,16 @@ SYSCALL_DEFINE1(uselib, const char __user *, library)
 		goto exit;
 
 	fsnotify_open(file);
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+	sreadahead_prof(file, 0, 0);
+/*              */
+
 
 	error = -ENOEXEC;
 	if(file->f_op) {
@@ -771,6 +791,16 @@ struct file *open_exec(const char *name)
 		goto exit;
 
 	fsnotify_open(file);
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+	sreadahead_prof(file, 0, 0);
+/*              */
+
 
 	err = deny_write_access(file);
 	if (err)
@@ -1220,7 +1250,7 @@ EXPORT_SYMBOL(install_exec_creds);
 /*
  * determine how safe it is to execute the proposed program
  * - the caller must hold ->cred_guard_mutex to protect against
- *   PTRACE_ATTACH
+ *   PTRACE_ATTACH or seccomp thread-sync
  */
 static int check_unsafe_exec(struct linux_binprm *bprm)
 {
@@ -1239,7 +1269,7 @@ static int check_unsafe_exec(struct linux_binprm *bprm)
 	 * This isn't strictly necessary, but it makes it harder for LSMs to
 	 * mess up.
 	 */
-	if (current->no_new_privs)
+	if (task_no_new_privs(current))
 		bprm->unsafe |= LSM_UNSAFE_NO_NEW_PRIVS;
 
 	n_fs = 1;
@@ -1279,7 +1309,7 @@ static void bprm_fill_uid(struct linux_binprm *bprm)
 	if (bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID)
 		return;
 
-	if (current->no_new_privs)
+	if (task_no_new_privs(current))
 		return;
 
 	inode = file_inode(bprm->file);

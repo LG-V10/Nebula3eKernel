@@ -107,6 +107,9 @@ struct backing_dev_info {
 	struct dentry *debug_dir;
 	struct dentry *debug_stats;
 #endif
+#ifdef CONFIG_CHECK_SYNC_TIME
+	unsigned int max_sync_count;
+#endif
 };
 
 int bdi_init(struct backing_dev_info *bdi);
@@ -218,6 +221,10 @@ static inline unsigned long bdi_stat_error(struct backing_dev_info *bdi)
 int bdi_set_min_ratio(struct backing_dev_info *bdi, unsigned int min_ratio);
 int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned int max_ratio);
 
+#ifdef CONFIG_CHECK_SYNC_TIME
+int bdi_set_max_sync_count(struct backing_dev_info *bdi, unsigned int max_sync_count);
+#endif
+
 /*
  * Flags in backing_dev_info::capability
  *
@@ -243,6 +250,8 @@ int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned int max_ratio);
  * BDI_CAP_EXEC_MAP:       Can be mapped for execution
  *
  * BDI_CAP_SWAP_BACKED:    Count shmem/tmpfs objects as swap-backed.
+ *
+ * BDI_CAP_STRICTLIMIT:    Keep number of dirty pages below bdi threshold.
  */
 #define BDI_CAP_NO_ACCT_DIRTY	0x00000001
 #define BDI_CAP_NO_WRITEBACK	0x00000002
@@ -254,6 +263,7 @@ int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned int max_ratio);
 #define BDI_CAP_NO_ACCT_WB	0x00000080
 #define BDI_CAP_SWAP_BACKED	0x00000100
 #define BDI_CAP_STABLE_WRITES	0x00000200
+#define BDI_CAP_STRICTLIMIT	0x00000400
 
 #define BDI_CAP_VMFLAGS \
 	(BDI_CAP_READ_MAP | BDI_CAP_WRITE_MAP | BDI_CAP_EXEC_MAP)

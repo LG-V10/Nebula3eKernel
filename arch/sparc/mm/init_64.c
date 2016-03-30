@@ -1698,7 +1698,7 @@ static void __init sun4v_ktsb_init(void)
 #endif
 }
 
-void __cpuinit sun4v_ktsb_register(void)
+void sun4v_ktsb_register(void)
 {
 	unsigned long pa, ret;
 
@@ -2065,7 +2065,7 @@ void __init mem_init(void)
 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
 
 	register_page_bootmem_info();
-	totalram_pages = free_all_bootmem();
+	free_all_bootmem();
 
 	/* We subtract one to account for the mem_map_zero page
 	 * allocated below.

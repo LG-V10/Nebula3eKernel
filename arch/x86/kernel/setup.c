@@ -170,7 +170,7 @@ static struct resource bss_resource = {
 
 #ifdef CONFIG_X86_32
 /* cpu data as detected by the assembly code in head.S */
-struct cpuinfo_x86 new_cpu_data __cpuinitdata = {
+struct cpuinfo_x86 new_cpu_data = {
 	.wp_works_ok = -1,
 };
 /* common cpu data for all cpus */
@@ -908,11 +908,11 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_EFI
 	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
 		     "EL32", 4)) {
-		set_bit(EFI_BOOT, &x86_efi_facility);
+		set_bit(EFI_BOOT, &efi.flags);
 	} else if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
 		     "EL64", 4)) {
-		set_bit(EFI_BOOT, &x86_efi_facility);
-		set_bit(EFI_64BIT, &x86_efi_facility);
+		set_bit(EFI_BOOT, &efi.flags);
+		set_bit(EFI_64BIT, &efi.flags);
 	}
 
 	if (efi_enabled(EFI_BOOT))

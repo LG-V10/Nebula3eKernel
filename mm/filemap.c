@@ -34,6 +34,7 @@
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
 #include "internal.h"
+#include "../fs/sreadahead_prof.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/filemap.h>
@@ -607,7 +608,7 @@ void unlock_page(struct page *page)
 {
 	VM_BUG_ON(!PageLocked(page));
 	clear_bit_unlock(PG_locked, &page->flags);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_page(page, PG_locked);
 }
 EXPORT_SYMBOL(unlock_page);
@@ -624,7 +625,7 @@ void end_page_writeback(struct page *page)
 	if (!test_clear_page_writeback(page))
 		BUG();
 
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_page(page, PG_writeback);
 }
 EXPORT_SYMBOL(end_page_writeback);
@@ -1525,7 +1526,25 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 }
 
 #define MMAP_LOTSAMISS  (100)
+#define BOOT_OAT_FILE_NAME "boot.oat"
+#define BOOT_OAT_FILE_SIZE 8
+#define MAX_MMAP_READ_AHEAD_SIZE 128
 
+static inline int strncmp_ex(const char *cs, const char *ct, size_t count)
+{
+	unsigned char c1, c2;
+
+	while (count) {
+		c1 = *cs++;
+		c2 = *ct++;
+		if(c1 != c2)
+			return c1 < c2 ? -1 : 1;
+		if(!c1)
+			break;
+		count--;
+	}
+	return 0;
+}
 /*
  * Synchronous readahead happens when we don't even find
  * a page in the page cache at all.
@@ -1564,7 +1583,19 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	/*
 	 * mmap read-around
 	 */
+#ifdef CONFIG_READAHEAD_MMAP_SIZE_ENABLE
+	ra_pages = CONFIG_READAHEAD_MMAP_PAGE_CNT;
+
+	// To reduce application entry time...
+	if (file->f_path.dentry != NULL) {
+		if(strncmp_ex(BOOT_OAT_FILE_NAME, file->f_path.dentry->d_name.name,
+			BOOT_OAT_FILE_SIZE)==0) {
+			ra_pages = MAX_MMAP_READ_AHEAD_SIZE;
+		}
+	}
+#else
 	ra_pages = max_sane_readahead(ra->ra_pages);
+#endif
 	ra->start = max_t(long, 0, offset - ra_pages / 2);
 	ra->size = ra_pages;
 	ra->async_size = ra_pages / 4;
@@ -1635,6 +1666,15 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		/* No page in the page cache at all */
 		do_sync_mmap_readahead(vma, ra, file, offset);
 		count_vm_event(PGMAJFAULT);
+		/*             
+   
+                                                          
+                                              
+   
+                              
+  */
+		sreadahead_prof(file, 0, 0);
+		/*              */
 		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
 		ret = VM_FAULT_MAJOR;
 retry_find:
@@ -2281,9 +2321,17 @@ repeat:
 	if (page)
 		goto found;
 
+retry:
 	page = __page_cache_alloc(gfp_mask & ~gfp_notmask);
 	if (!page)
 		return NULL;
+
+	if (is_cma_pageblock(page)) {
+		__free_page(page);
+		gfp_notmask |= __GFP_MOVABLE;
+		goto retry;
+	}
+
 	status = add_to_page_cache_lru(page, mapping, index,
 						GFP_KERNEL & ~gfp_notmask);
 	if (unlikely(status)) {
@@ -2347,7 +2395,7 @@ again:
 
 		status = a_ops->write_begin(file, mapping, pos, bytes, flags,
 						&page, &fsdata);
-		if (unlikely(status))
+		if (unlikely(status < 0))
 			break;
 
 		if (mapping_writably_mapped(mapping))

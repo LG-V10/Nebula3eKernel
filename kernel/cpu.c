@@ -20,25 +20,36 @@
 #include <linux/gfp.h>
 #include <linux/suspend.h>
 
+#include <trace/events/sched.h>
+
 #include "smpboot.h"
+
+#ifdef CONFIG_MSM_HOTPLUG
+#include <linux/msm_hotplug.h>
+#endif
 
 #ifdef CONFIG_SMP
 /* Serializes the updates to cpu_online_mask, cpu_present_mask */
 static DEFINE_MUTEX(cpu_add_remove_lock);
 
 /*
- * The following two API's must be used when attempting
- * to serialize the updates to cpu_online_mask, cpu_present_mask.
+ * The following two APIs (cpu_maps_update_begin/done) must be used when
+ * attempting to serialize the updates to cpu_online_mask & cpu_present_mask.
+ * The APIs cpu_notifier_register_begin/done() must be used to protect CPU
+ * hotplug callback (un)registration performed using __register_cpu_notifier()
+ * or __unregister_cpu_notifier().
  */
 void cpu_maps_update_begin(void)
 {
 	mutex_lock(&cpu_add_remove_lock);
 }
+EXPORT_SYMBOL(cpu_notifier_register_begin);
 
 void cpu_maps_update_done(void)
 {
 	mutex_unlock(&cpu_add_remove_lock);
 }
+EXPORT_SYMBOL(cpu_notifier_register_done);
 
 static RAW_NOTIFIER_HEAD(cpu_chain);
 
@@ -169,6 +180,11 @@ int __ref register_cpu_notifier(struct notifier_block *nb)
 	return ret;
 }
 
+int __ref __register_cpu_notifier(struct notifier_block *nb)
+{
+	return raw_notifier_chain_register(&cpu_chain, nb);
+}
+
 static int __cpu_notify(unsigned long val, void *v, int nr_to_call,
 			int *nr_calls)
 {
@@ -192,6 +208,7 @@ static void cpu_notify_nofail(unsigned long val, void *v)
 	BUG_ON(cpu_notify(val, v));
 }
 EXPORT_SYMBOL(register_cpu_notifier);
+EXPORT_SYMBOL(__register_cpu_notifier);
 
 void __ref unregister_cpu_notifier(struct notifier_block *nb)
 {
@@ -200,6 +217,12 @@ void __ref unregister_cpu_notifier(struct notifier_block *nb)
 	cpu_maps_update_done();
 }
 EXPORT_SYMBOL(unregister_cpu_notifier);
+
+void __ref __unregister_cpu_notifier(struct notifier_block *nb)
+{
+	raw_notifier_chain_unregister(&cpu_chain, nb);
+}
+EXPORT_SYMBOL(__unregister_cpu_notifier);
 
 /**
  * clear_tasks_mm_cpumask - Safely clear tasks' mm_cpumask for a CPU
@@ -340,6 +363,7 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 
 out_release:
 	cpu_hotplug_done();
+	trace_sched_cpu_hotplug(cpu, err, 0);
 	if (!err)
 		cpu_notify_nofail(CPU_POST_DEAD | mod, hcpu);
 	return err;
@@ -366,7 +390,7 @@ EXPORT_SYMBOL(cpu_down);
 #endif /*CONFIG_HOTPLUG_CPU*/
 
 /* Requires cpu_add_remove_lock to be held */
-static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
+static int _cpu_up(unsigned int cpu, int tasks_frozen)
 {
 	int ret, nr_calls = 0;
 	void *hcpu = (void *)(long)cpu;
@@ -415,17 +439,26 @@ out_notify:
 		__cpu_notify(CPU_UP_CANCELED | mod, hcpu, nr_calls, NULL);
 out:
 	cpu_hotplug_done();
+	trace_sched_cpu_hotplug(cpu, ret, 1);
 
 	return ret;
 }
 
-int __cpuinit cpu_up(unsigned int cpu)
+int cpu_up(unsigned int cpu)
 {
 	int err = 0;
 
 #ifdef	CONFIG_MEMORY_HOTPLUG
 	int nid;
 	pg_data_t	*pgdat;
+#endif
+
+#ifdef CONFIG_MSM_HOTPLUG
+	if (msm_hotplug_scr_suspended && msm_enabled) {
+		if ((cpu == 4 || cpu == 5) &&
+		    !msm_hotplug_fingerprint_called)
+			return 0;
+	}
 #endif
 
 	if (!cpu_possible(cpu)) {
@@ -618,7 +651,7 @@ core_initcall(cpu_hotplug_pm_sync_init);
  * It must be called by the arch code on the new cpu, before the new cpu
  * enables interrupts and before the "boot" cpu returns from __cpu_up().
  */
-void __cpuinit notify_cpu_starting(unsigned int cpu)
+void notify_cpu_starting(unsigned int cpu)
 {
 	unsigned long val = CPU_STARTING;
 
@@ -728,3 +761,23 @@ void init_cpu_online(const struct cpumask *src)
 {
 	cpumask_copy(to_cpumask(cpu_online_bits), src);
 }
+
+static ATOMIC_NOTIFIER_HEAD(idle_notifier);
+
+void idle_notifier_register(struct notifier_block *n)
+{
+	atomic_notifier_chain_register(&idle_notifier, n);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_register);
+
+void idle_notifier_unregister(struct notifier_block *n)
+{
+	atomic_notifier_chain_unregister(&idle_notifier, n);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_unregister);
+
+void idle_notifier_call_chain(unsigned long val)
+{
+	atomic_notifier_call_chain(&idle_notifier, val, NULL);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_call_chain);

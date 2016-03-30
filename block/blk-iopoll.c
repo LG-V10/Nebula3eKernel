@@ -52,7 +52,7 @@ EXPORT_SYMBOL(blk_iopoll_sched);
 void __blk_iopoll_complete(struct blk_iopoll *iop)
 {
 	list_del(&iop->list);
-	smp_mb__before_clear_bit();
+	smp_mb__before_atomic();
 	clear_bit_unlock(IOPOLL_F_SCHED, &iop->state);
 }
 EXPORT_SYMBOL(__blk_iopoll_complete);
@@ -164,7 +164,7 @@ EXPORT_SYMBOL(blk_iopoll_disable);
 void blk_iopoll_enable(struct blk_iopoll *iop)
 {
 	BUG_ON(!test_bit(IOPOLL_F_SCHED, &iop->state));
-	smp_mb__before_clear_bit();
+	smp_mb__before_atomic();
 	clear_bit_unlock(IOPOLL_F_SCHED, &iop->state);
 }
 EXPORT_SYMBOL(blk_iopoll_enable);
@@ -189,7 +189,7 @@ void blk_iopoll_init(struct blk_iopoll *iop, int weight, blk_iopoll_fn *poll_fn)
 }
 EXPORT_SYMBOL(blk_iopoll_init);
 
-static int __cpuinit blk_iopoll_cpu_notify(struct notifier_block *self,
+static int blk_iopoll_cpu_notify(struct notifier_block *self,
 					  unsigned long action, void *hcpu)
 {
 	/*
@@ -209,7 +209,7 @@ static int __cpuinit blk_iopoll_cpu_notify(struct notifier_block *self,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __cpuinitdata blk_iopoll_cpu_notifier = {
+static struct notifier_block blk_iopoll_cpu_notifier = {
 	.notifier_call	= blk_iopoll_cpu_notify,
 };
 

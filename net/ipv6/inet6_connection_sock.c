@@ -81,9 +81,10 @@ struct dst_entry *inet6_csk_route_req(struct sock *sk,
 	final_p = fl6_update_dst(fl6, np->opt, &final);
 	fl6->saddr = treq->loc_addr;
 	fl6->flowi6_oif = treq->iif;
-	fl6->flowi6_mark = sk->sk_mark;
+	fl6->flowi6_mark = inet_rsk(req)->ir_mark;
 	fl6->fl6_dport = inet_rsk(req)->rmt_port;
 	fl6->fl6_sport = inet_rsk(req)->loc_port;
+	fl6->flowi6_uid = sock_i_uid(sk);
 	security_req_classify_flow(req, flowi6_to_flowi(fl6));
 
 	dst = ip6_dst_lookup_flow(sk, fl6, final_p, false);
@@ -96,8 +97,13 @@ struct dst_entry *inet6_csk_route_req(struct sock *sk,
 /*
  * request_sock (formerly open request) hash tables.
  */
+#ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
+u32 inet6_synq_hash(const struct in6_addr *raddr, const __be16 rport,
+		    const u32 rnd, const u32 synq_hsize)
+#else
 static u32 inet6_synq_hash(const struct in6_addr *raddr, const __be16 rport,
 			   const u32 rnd, const u32 synq_hsize)
+#endif
 {
 	u32 c;
 

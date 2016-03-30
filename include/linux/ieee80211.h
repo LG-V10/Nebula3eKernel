@@ -152,6 +152,10 @@ static inline u16 ieee80211_sn_sub(u16 sn1, u16 sn2)
    802.11e clarifies the figure in section 7.1.2. The frame body is
    up to 2304 octets long (maximum MSDU size) plus any crypt overhead. */
 #define IEEE80211_MAX_DATA_LEN		2304
+/* 802.11ad extends maximum MSDU size for DMG (freq > 40Ghz) networks
+ * to 7920 bytes, see 8.2.3 General frame format
+ */
+#define IEEE80211_MAX_DATA_LEN_DMG	7920
 /* 30 byte 4 addr hdr, 2 byte QoS, 2304 byte MSDU, 12 byte crypt, 4 byte FCS */
 #define IEEE80211_MAX_FRAME_LEN		2352
 
@@ -1827,6 +1831,7 @@ enum ieee80211_key_len {
 	WLAN_KEY_LEN_CCMP = 16,
 	WLAN_KEY_LEN_TKIP = 32,
 	WLAN_KEY_LEN_AES_CMAC = 16,
+	WLAN_KEY_LEN_WAPI_SMS4 = 32,
 };
 
 /* Public action codes */
@@ -2032,16 +2037,40 @@ enum ieee80211_sa_query_action {
 #define WLAN_CIPHER_SUITE_AES_CMAC	0x000FAC06
 #define WLAN_CIPHER_SUITE_GCMP		0x000FAC08
 
-#define WLAN_CIPHER_SUITE_SMS4		0x00147201
+/* WAPI brcm will use the value 0x000FAC30*/
+#ifdef CONFIG_BRCM_WAPI
+#define WLAN_CIPHER_SUITE_SMS4          0x000FAC30
+#else
+#define WLAN_CIPHER_SUITE_SMS4          0x00147201
+#endif
 
 /* AKM suite selectors */
 #define WLAN_AKM_SUITE_8021X		0x000FAC01
 #define WLAN_AKM_SUITE_PSK		0x000FAC02
+
+/*                                              */
+/* BRCM_VE */
+#define WLAN_AKM_SUITE_FT_8021X		0x000FAC03
+#define WLAN_AKM_SUITE_FT_PSK		0x000FAC04
+#define WLAN_CIPHER_SUITE_PMK		0x00904C00
+/* BRCM_VE */
+/* BRCM_CCX */
+#define WLAN_AKM_SUITE_CCKM		0x00409600
+#define WLAN_AKM_SUITE_OSEN		0x506f9a01
+/* BRCM_CCX */
+/*                                              */
+
 #define WLAN_AKM_SUITE_8021X_SHA256	0x000FAC05
 #define WLAN_AKM_SUITE_PSK_SHA256	0x000FAC06
 #define WLAN_AKM_SUITE_TDLS		0x000FAC07
 #define WLAN_AKM_SUITE_SAE		0x000FAC08
 #define WLAN_AKM_SUITE_FT_OVER_SAE	0x000FAC09
+
+/* WAPI brcm */
+#ifdef CONFIG_BRCM_WAPI
+#define WLAN_AKM_SUITE_WAPI_PSK         0x000FAC32
+#define WLAN_AKM_SUITE_WAPI_CERT        0x000FAC38
+#endif
 
 #define WLAN_MAX_KEY_LEN		32
 

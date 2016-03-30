@@ -238,7 +238,7 @@ static int journal_submit_data_buffers(journal_t *journal,
 		spin_lock(&journal->j_list_lock);
 		J_ASSERT(jinode->i_transaction == commit_transaction);
 		clear_bit(__JI_COMMIT_RUNNING, &jinode->i_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit(&jinode->i_flags, __JI_COMMIT_RUNNING);
 	}
 	spin_unlock(&journal->j_list_lock);
@@ -276,7 +276,7 @@ static int journal_finish_inode_data_buffers(journal_t *journal,
 		}
 		spin_lock(&journal->j_list_lock);
 		clear_bit(__JI_COMMIT_RUNNING, &jinode->i_flags);
-		smp_mb__after_clear_bit();
+		smp_mb__after_atomic();
 		wake_up_bit(&jinode->i_flags, __JI_COMMIT_RUNNING);
 	}
 
@@ -738,7 +738,11 @@ start_journal_io:
 				clear_buffer_dirty(bh);
 				set_buffer_uptodate(bh);
 				bh->b_end_io = journal_end_buffer_io_sync;
+#ifdef CONFIG_MACH_MSM8992_PPLUS
+				submit_bh(WRITE_SYNC | REQ_PREEMPT, bh);
+#else
 				submit_bh(WRITE_SYNC, bh);
+#endif
 			}
 			cond_resched();
 			stats.run.rs_blocks_logged += bufs;

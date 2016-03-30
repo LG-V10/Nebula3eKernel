@@ -310,8 +310,6 @@ asmlinkage void do_softirq(void)
  */
 void irq_enter(void)
 {
-	int cpu = smp_processor_id();
-
 	rcu_irq_enter();
 	if (is_idle_task(current) && !in_interrupt()) {
 		/*
@@ -319,7 +317,7 @@ void irq_enter(void)
 		 * here, as softirq will be serviced on return from interrupt.
 		 */
 		local_bh_disable();
-		tick_check_idle(cpu);
+		tick_check_idle();
 		_local_bh_enable();
 	}
 
@@ -714,7 +712,7 @@ static void takeover_tasklets(unsigned int cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
-static int __cpuinit cpu_callback(struct notifier_block *nfb,
+static int cpu_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
 {
@@ -729,7 +727,7 @@ static int __cpuinit cpu_callback(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __cpuinitdata cpu_nfb = {
+static struct notifier_block cpu_nfb = {
 	.notifier_call = cpu_callback
 };
 
@@ -760,7 +758,6 @@ int __init __weak early_irq_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_GENERIC_HARDIRQS
 int __init __weak arch_probe_nr_irqs(void)
 {
 	return NR_IRQS_LEGACY;
@@ -770,4 +767,3 @@ int __init __weak arch_early_irq_init(void)
 {
 	return 0;
 }
-#endif
