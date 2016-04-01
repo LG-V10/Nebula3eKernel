@@ -62,11 +62,7 @@ libs-y		+= $(LIBGCC)
 ifeq ($(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE),y)
 KBUILD_IMAGE	:= Image.gz-dtb
 else
-ifeq ($(CONFIG_BUILD_ARM64_UNCOMPRESSED_APPENDED_DTB_IMAGE),y)
-KBUILD_IMAGE	:= Image-dtb
-else
 KBUILD_IMAGE	:= Image.gz
-endif
 endif
 
 KBUILD_DTBS	:= dtbs
@@ -96,7 +92,7 @@ PHONY += vdso_install
 vdso_install:
 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
 
-Image-dtb Image.gz-dtb: vmlinux scripts dtbs
+Image.gz-dtb: vmlinux scripts dtbs
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 # We use MRPROPER_FILES and CLEAN_FILES now
