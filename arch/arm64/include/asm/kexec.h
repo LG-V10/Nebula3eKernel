@@ -31,7 +31,7 @@
 #ifdef CONFIG_KEXEC_HARDBOOT
 #define KEXEC_HB_PAGE_MAGIC 0x4a5db007
 // Hardboot: for Nexus 5X (bullhead). Address reserved in device tree.
-#define KEXEC_HB_PAGE_ADDR UL(0x1FE00000)
+#define KEXEC_HB_PAGE_ADDR UL(0x00000000)
 #endif
 
 #if !defined(__ASSEMBLY__)
