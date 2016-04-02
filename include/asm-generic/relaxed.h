@@ -1,5 +1,5 @@
 /*
- * arm64/include/asm/relaxed.h
+ * include/asm-generic/relaxed.h
  *
  * Copyright (c) 2014 NVIDIA Corporation. All rights reserved.
  * This software is licensed under the terms of the GNU General Public
@@ -12,22 +12,19 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _ASM_RELAXED_H_
-#define _ASM_RELAXED_H_
-
-#include <asm/atomic.h>
+#ifndef _ASM_GENERIC_RELAXED_H_
+#define _ASM_GENERIC_RELAXED_H_
 
 #ifndef cpu_relaxed_read_short
-#define cpu_relaxed_read_short(p)	ldax16(p)
+#define cpu_relaxed_read_short(p)	(*(p))
 #endif
 
 #ifndef cpu_relaxed_read
-#define cpu_relaxed_read(p)		ldax32(p)
+#define cpu_relaxed_read(p)		(*(p))
 #endif
 
 #ifndef cpu_relaxed_read_long
-#define cpu_relaxed_read_long(p)	ldax64((u64 *)p)
+#define cpu_relaxed_read_long(p)	(*(p))
 #endif
 
-#include <asm-generic/relaxed.h>
-#endif /*_ASM_RELAXED_H_*/
+#endif /*_ASM_GENERIC_RELAXED_H_*/
