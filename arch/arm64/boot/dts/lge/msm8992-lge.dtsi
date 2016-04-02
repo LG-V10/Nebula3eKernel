@@ -19,6 +19,14 @@
 			reg = <0 0x0ff00000 0 0x100000>;
 			label = "ramoops_mem";
 		};
+		
+		kexechb_mem: kexechb_region@0 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			reg = <0 0x0fe00000 0 0x0100000>;
+			linux,remove-completely;
+			label = "kexechb_mem";
+		};
 
 		dfps_data_mem: dfps_data_mem@0 {
 			status = "disabled";
@@ -50,6 +58,17 @@
 		ftrace-size = <0x40000>;
 		dump-oops = <1>;
 	};
+	
+	kexecb {
+		compatible = "kexecb";
+		mem-size = <0x10000>;
+		mem-address = <0x0fe00000>;
+		record-size = <1092>;
+		console-size = <0x10000>;
+		ftrace-size = <0x10000>;
+		dump-oops = <1>;
+	};
+	
 
 	crash_fb {
 		compatible = "crash_fb";
