@@ -303,8 +303,6 @@ config CPU_FREQ_GOV_ZZMOOVE
 
 	  if in doubt, say N.
 
-<<<<<<< HEAD
-=======
 config CPU_FREQ_GOV_DESPAIR
 	tristate "'despair' cpufreq governor"
 	depends on CPU_FREQ
@@ -330,7 +328,6 @@ config CPU_FREQ_GOV_SCHED
 
 	  If in doubt, say N.
 
->>>>>>> 14e4388... cpufreq: add despair governor
 config CPU_BOOST
 	tristate "Event base short term CPU freq boost"
 	depends on CPU_FREQ
